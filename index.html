@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Chat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="chat-container">
+            <!-- Login Screen -->
+            <div id="login-screen" class="screen active">
+                <h1>🗣️ Real-Time Chat</h1>
+                <div class="form-group">
+                    <input type="text" id="username" placeholder="Enter your username" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <input type="text" id="room" placeholder="Enter room name" maxlength="20">
+                </div>
+                <button id="join-btn">Join Chat</button>
+            </div>
+
+            <!-- Chat Screen -->
+            <div id="chat-screen" class="screen">
+                <div class="chat-header">
+                    <h3 id="room-title">Room: General</h3>
+                    <div class="user-info">
+                        <span id="current-user"></span>
+                        <button id="leave-btn">Leave</button>
+                    </div>
+                </div>
+                
+                <div class="users-panel">
+                    <div class="users-header">
+                        <span>Online Users</span>
+                    </div>
+                    <div id="users-list"></div>
+                </div>
+
+                <div class="messages-container">
+                    <div id="messages"></div>
+                    <div id="typing-indicator"></div>
+                </div>
+
+                <div class="message-input-container">
+                    <input type="text" id="message-input" placeholder="Type a message..." maxlength="500">
+                    <button id="send-btn">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
