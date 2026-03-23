@@ -40,6 +40,8 @@ function joinChat() {
 
     currentUser = username;
     currentRoom = room;
+    messages.innerHTML = '';
+    typingIndicator.textContent = '';
 
     socket.emit('join', { username, room });
 
@@ -85,8 +87,20 @@ function stopTyping() {
     socket.emit('typing', { isTyping: false });
 }
 
+socket.on('room history', (history) => {
+    messages.innerHTML = '';
+
+    history.forEach((message) => {
+        addMessage(message);
+    });
+});
+
 socket.on('chat message', (data) => {
     addMessage(data);
+});
+
+socket.on('message error', (errorMessage) => {
+    addSystemMessage(errorMessage);
 });
 
 socket.on('user joined', (data) => {
