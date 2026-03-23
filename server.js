@@ -74,6 +74,12 @@ io.on('connection', (socket) => {
         message: `${user.username} left the chat` 
       });
       users.delete(socket.id);
+
+      const roomUsers = Array.from(users.values())
+        .filter(roomUser => roomUser.room === user.room)
+        .map(roomUser => roomUser.username);
+
+      io.to(user.room).emit('room users', roomUsers);
     }
     console.log('User disconnected:', socket.id);
   });
