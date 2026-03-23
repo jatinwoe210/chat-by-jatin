@@ -50,6 +50,45 @@ function normalizeMongoUri(uri) {
 
 const MONGODB_URI = normalizeMongoUri(RAW_MONGODB_URI);
 
+const messageSchema = new mongoose.Schema(
+  {
+    room: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    username: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    message: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 500
+    }
+  },
+  {
+    timestamps: true
+  }
+);
+
+const Message = mongoose.model('Message', messageSchema);
+
+function formatMessage(messageDocument) {
+  const timestampSource = messageDocument.createdAt || new Date();
+
+  return {
+    username: messageDocument.username,
+    message: messageDocument.message,
+    timestamp: new Date(timestampSource).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  };
+}
+
 // Serve static files
 app.use(express.static(path.join(__dirname)));
 
@@ -71,11 +110,22 @@ mongoose.connection.on('disconnected', () => {
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  socket.on('join', (data) => {
+  socket.on('join', async (data) => {
     const { username, room } = data;
 
     users.set(socket.id, { username, room });
     socket.join(room);
+
+    try {
+      const previousMessages = await Message.find({ room })
+        .sort({ createdAt: 1 })
+        .lean();
+
+      socket.emit('room history', previousMessages.map(formatMessage));
+    } catch (error) {
+      console.error(`Failed to load message history for room "${room}":`, error.message);
+      socket.emit('room history', []);
+    }
 
     socket.to(room).emit('user joined', {
       username,
@@ -89,15 +139,25 @@ io.on('connection', (socket) => {
     io.to(room).emit('room users', roomUsers);
   });
 
-  socket.on('chat message', (data) => {
+  socket.on('chat message', async (data) => {
     const user = users.get(socket.id);
+    const messageText = data.message?.trim();
 
-    if (user) {
-      io.to(user.room).emit('chat message', {
+    if (!user || !messageText) {
+      return;
+    }
+
+    try {
+      const savedMessage = await Message.create({
+        room: user.room,
         username: user.username,
-        message: data.message,
-        timestamp: new Date().toLocaleTimeString()
+        message: messageText
       });
+
+      io.to(user.room).emit('chat message', formatMessage(savedMessage));
+    } catch (error) {
+      console.error(`Failed to save message for room "${user.room}":`, error.message);
+      socket.emit('message error', 'Unable to send message right now. Please try again.');
     }
   });
 
