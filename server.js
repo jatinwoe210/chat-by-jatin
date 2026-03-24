@@ -5,6 +5,7 @@ const http = require('http');
 const mongoose = require('mongoose');
 const socketIo = require('socket.io');
 const path = require('path');
+const bcrypt = require('./bcrypt');
 
 const app = express();
 const server = http.createServer(app);
@@ -17,6 +18,7 @@ const io = socketIo(server, {
 
 const RAW_MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://jatin:jatinwoeyua@19july@jatin-xo.vi8oyak.mongodb.net/?appName=Jatin-XO';
 const PORT = process.env.PORT || 3000;
+const SALT_ROUNDS = 10;
 
 function normalizeMongoUri(uri) {
   const protocolSeparator = '://';
@@ -76,6 +78,31 @@ const messageSchema = new mongoose.Schema(
 
 const Message = mongoose.model('Message', messageSchema);
 
+const userSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true
+    },
+    password: {
+      type: String,
+      required: true
+    }
+  },
+  {
+    timestamps: true
+  }
+);
+
+const User = mongoose.model('User', userSchema);
+
 function formatMessage(messageDocument) {
   const timestampSource = messageDocument.createdAt || new Date();
 
@@ -90,7 +117,107 @@ function formatMessage(messageDocument) {
 }
 
 // Serve static files
+app.use(express.json());
 app.use(express.static(path.join(__dirname)));
+
+app.post('/api/auth/signup', async (req, res) => {
+  const { name, username, password } = req.body;
+  const trimmedName = name?.trim();
+  const trimmedUsername = username?.trim();
+  const trimmedPassword = password?.trim();
+
+  if (!trimmedName || !trimmedUsername || !trimmedPassword) {
+    return res.status(400).json({
+      success: false,
+      message: 'Name, username, and password are required.'
+    });
+  }
+
+  try {
+    const existingUser = await User.findOne({ username: trimmedUsername }).lean();
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'Username already exists.'
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(trimmedPassword, SALT_ROUNDS);
+
+    await User.create({
+      name: trimmedName,
+      username: trimmedUsername,
+      password: hashedPassword
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Signup successful.'
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: 'Username already exists.'
+      });
+    }
+
+    console.error('Signup failed:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to sign up right now. Please try again.'
+    });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  const trimmedUsername = username?.trim();
+  const trimmedPassword = password?.trim();
+
+  if (!trimmedUsername || !trimmedPassword) {
+    return res.status(400).json({
+      success: false,
+      message: 'Username and password are required.'
+    });
+  }
+
+  try {
+    const user = await User.findOne({ username: trimmedUsername });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid username or password.'
+      });
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(trimmedPassword, user.password);
+
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid username or password.'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Login successful.',
+      user: {
+        name: user.name,
+        username: user.username
+      }
+    });
+  } catch (error) {
+    console.error('Login failed:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to log in right now. Please try again.'
+    });
+  }
+});
 
 // Store users by socket id
 const users = new Map();
