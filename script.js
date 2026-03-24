@@ -50,7 +50,7 @@ function setAuthMode(mode) {
 
 async function submitAuthForm() {
     const name = nameInput.value.trim();
-    const username = usernameInput.value.trim();
+    const username = usernameInput.value;
     const password = passwordInput.value.trim();
     const isSignup = authMode === 'signup';
 

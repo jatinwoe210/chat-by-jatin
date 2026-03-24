@@ -56,8 +56,7 @@ const messageSchema = new mongoose.Schema(
   {
     username: {
       type: String,
-      required: true,
-      trim: true
+      required: true
     },
     message: {
       type: String,
@@ -83,8 +82,7 @@ const userSchema = new mongoose.Schema(
     username: {
       type: String,
       required: true,
-      unique: true,
-      trim: true
+      unique: true
     },
     password: {
       type: String,
@@ -118,10 +116,10 @@ app.use(express.static(path.join(__dirname)));
 app.post('/api/auth/signup', async (req, res) => {
   const { name, username, password } = req.body;
   const trimmedName = name?.trim();
-  const trimmedUsername = username?.trim();
+  const rawUsername = typeof username === 'string' ? username : '';
   const trimmedPassword = password?.trim();
 
-  if (!trimmedName || !trimmedUsername || !trimmedPassword) {
+  if (!trimmedName || !rawUsername || !trimmedPassword) {
     return res.status(400).json({
       success: false,
       message: 'Name, username, and password are required.'
@@ -129,7 +127,7 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 
   try {
-    const existingUser = await User.findOne({ username: trimmedUsername }).lean();
+    const existingUser = await User.findOne({ username: rawUsername }).lean();
 
     if (existingUser) {
       return res.status(409).json({
@@ -142,7 +140,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
     await User.create({
       name: trimmedName,
-      username: trimmedUsername,
+      username: rawUsername,
       password: hashedPassword
     });
 
@@ -168,10 +166,10 @@ app.post('/api/auth/signup', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
-  const trimmedUsername = username?.trim();
+  const rawUsername = typeof username === 'string' ? username : '';
   const trimmedPassword = password?.trim();
 
-  if (!trimmedUsername || !trimmedPassword) {
+  if (!rawUsername || !trimmedPassword) {
     return res.status(400).json({
       success: false,
       message: 'Username and password are required.'
@@ -179,7 +177,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ username: trimmedUsername });
+    const user = await User.findOne({ username: rawUsername });
 
     if (!user) {
       return res.status(401).json({
@@ -233,7 +231,7 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   socket.on('join', async (data) => {
-    const username = data?.username?.trim();
+    const username = typeof data?.username === 'string' ? data.username : '';
 
     if (!username) {
       return;
