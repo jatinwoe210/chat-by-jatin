@@ -54,11 +54,6 @@ const MONGODB_URI = normalizeMongoUri(RAW_MONGODB_URI);
 
 const messageSchema = new mongoose.Schema(
   {
-    room: {
-      type: String,
-      required: true,
-      trim: true
-    },
     username: {
       type: String,
       required: true,
@@ -238,32 +233,31 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   socket.on('join', async (data) => {
-    const { username, room } = data;
+    const username = data?.username?.trim();
 
-    users.set(socket.id, { username, room });
-    socket.join(room);
+    if (!username) {
+      return;
+    }
+
+    users.set(socket.id, { username });
 
     try {
-      const previousMessages = await Message.find({ room })
+      const previousMessages = await Message.find()
         .sort({ createdAt: 1 })
         .lean();
 
-      socket.emit('room history', previousMessages.map(formatMessage));
+      socket.emit('chat history', previousMessages.map(formatMessage));
     } catch (error) {
-      console.error(`Failed to load message history for room "${room}":`, error.message);
-      socket.emit('room history', []);
+      console.error('Failed to load chat history:', error.message);
+      socket.emit('chat history', []);
     }
 
-    socket.to(room).emit('user joined', {
+    socket.broadcast.emit('user joined', {
       username,
       message: `${username} joined the chat`
     });
 
-    const roomUsers = Array.from(users.values())
-      .filter((user) => user.room === room)
-      .map((user) => user.username);
-
-    io.to(room).emit('room users', roomUsers);
+    io.emit('room users', Array.from(users.values()).map((user) => user.username));
   });
 
   socket.on('chat message', async (data) => {
@@ -276,14 +270,13 @@ io.on('connection', (socket) => {
 
     try {
       const savedMessage = await Message.create({
-        room: user.room,
         username: user.username,
         message: messageText
       });
 
-      io.to(user.room).emit('chat message', formatMessage(savedMessage));
+      io.emit('chat message', formatMessage(savedMessage));
     } catch (error) {
-      console.error(`Failed to save message for room "${user.room}":`, error.message);
+      console.error(`Failed to save message for user "${user.username}":`, error.message);
       socket.emit('message error', 'Unable to send message right now. Please try again.');
     }
   });
@@ -292,7 +285,7 @@ io.on('connection', (socket) => {
     const user = users.get(socket.id);
 
     if (user) {
-      socket.to(user.room).emit('user typing', {
+      socket.broadcast.emit('user typing', {
         username: user.username,
         isTyping: data.isTyping
       });
@@ -303,17 +296,13 @@ io.on('connection', (socket) => {
     const user = users.get(socket.id);
 
     if (user) {
-      socket.to(user.room).emit('user left', {
+      socket.broadcast.emit('user left', {
         username: user.username,
         message: `${user.username} left the chat`
       });
       users.delete(socket.id);
 
-      const roomUsers = Array.from(users.values())
-        .filter((roomUser) => roomUser.room === user.room)
-        .map((roomUser) => roomUser.username);
-
-      io.to(user.room).emit('room users', roomUsers);
+      io.emit('room users', Array.from(users.values()).map((roomUser) => roomUser.username));
     }
 
     console.log('User disconnected:', socket.id);

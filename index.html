@@ -33,9 +33,6 @@
                             <input type="password" id="password" placeholder="Password" maxlength="50" autocomplete="current-password">
                         </div>
 
-                        <div class="form-group">
-                            <input type="text" id="room" placeholder="Room (optional)" maxlength="20">
-                        </div>
                     </div>
 
                     <p id="auth-message" class="auth-message" aria-live="polite"></p>
@@ -62,15 +59,8 @@
 
                     <div class="users-panel">
                         <div class="users-header">
-                            <span>Room members</span>
+                            <span>Online users</span>
                             <span id="user-count">0 online</span>
-                        </div>
-                        <div class="room-summary">
-                            <div>
-                                <p class="room-label">Current room</p>
-                                <h3 id="room-title">General</h3>
-                            </div>
-                            <span class="room-badge">Live</span>
                         </div>
                         <div id="users-list" class="users-list"></div>
                     </div>
@@ -79,8 +69,8 @@
                 <main class="conversation-panel">
                     <div class="chat-header">
                         <div>
-                            <p class="chat-kicker">Encrypted-style room chat</p>
-                            <h2 id="chat-room-heading">General</h2>
+                            <p class="chat-kicker">Encrypted-style global chat</p>
+                            <h2>General chat</h2>
                         </div>
                         <div class="chat-status">
                             <span class="status-dot"></span>

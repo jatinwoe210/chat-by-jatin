@@ -1,14 +1,12 @@
 const socket = io();
 
 let currentUser = '';
-let currentRoom = '';
 
 const loginScreen = document.getElementById('login-screen');
 const chatScreen = document.getElementById('chat-screen');
 const nameInput = document.getElementById('name');
 const usernameInput = document.getElementById('username');
 const passwordInput = document.getElementById('password');
-const roomInput = document.getElementById('room');
 const nameGroup = document.getElementById('name-group');
 const showLoginBtn = document.getElementById('show-login-btn');
 const showSignupBtn = document.getElementById('show-signup-btn');
@@ -19,8 +17,6 @@ const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 const messages = document.getElementById('messages');
 const usersList = document.getElementById('users-list');
-const roomTitle = document.getElementById('room-title');
-const chatRoomHeading = document.getElementById('chat-room-heading');
 const currentUserSpan = document.getElementById('current-user');
 const sidebarAvatar = document.getElementById('sidebar-avatar');
 const typingIndicator = document.getElementById('typing-indicator');
@@ -33,7 +29,7 @@ showLoginBtn.addEventListener('click', () => setAuthMode('login'));
 showSignupBtn.addEventListener('click', () => setAuthMode('signup'));
 authSubmitBtn.addEventListener('click', submitAuthForm);
 
-[nameInput, usernameInput, passwordInput, roomInput].forEach((input) => {
+[nameInput, usernameInput, passwordInput].forEach((input) => {
     input.addEventListener('keypress', (event) => {
         if (event.key === 'Enter') submitAuthForm();
     });
@@ -56,7 +52,6 @@ async function submitAuthForm() {
     const name = nameInput.value.trim();
     const username = usernameInput.value.trim();
     const password = passwordInput.value.trim();
-    const room = roomInput.value.trim() || 'General';
     const isSignup = authMode === 'signup';
 
     if (isSignup && !name) {
@@ -110,7 +105,6 @@ async function submitAuthForm() {
         }
 
         currentUser = username;
-        currentRoom = room;
         enterChat();
     } catch (error) {
         showAuthMessage('Unable to connect right now. Please try again.', true);
@@ -134,13 +128,11 @@ function enterChat() {
     messages.innerHTML = '';
     typingIndicator.textContent = '';
 
-    socket.emit('join', { username: currentUser, room: currentRoom });
+    socket.emit('join', { username: currentUser });
 
     loginScreen.classList.remove('active');
     chatScreen.classList.add('active');
 
-    roomTitle.textContent = currentRoom;
-    chatRoomHeading.textContent = currentRoom;
     currentUserSpan.textContent = currentUser;
     sidebarAvatar.textContent = currentUser.charAt(0).toUpperCase();
     window.location.hash = 'chat';
@@ -179,7 +171,7 @@ function stopTyping() {
     socket.emit('typing', { isTyping: false });
 }
 
-socket.on('room history', (history) => {
+socket.on('chat history', (history) => {
     messages.innerHTML = '';
 
     history.forEach((message) => {
@@ -248,7 +240,7 @@ function updateUsersList(userList) {
     userList.forEach((username) => {
         const userDiv = document.createElement('div');
         const activeClass = username === currentUser ? ' active' : '';
-        const subtitle = username === currentUser ? 'You' : `In ${currentRoom}`;
+        const subtitle = username === currentUser ? 'You' : 'Online';
 
         userDiv.className = `user-item${activeClass}`;
         userDiv.innerHTML = `
