@@ -5,9 +5,15 @@ let currentRoom = '';
 
 const loginScreen = document.getElementById('login-screen');
 const chatScreen = document.getElementById('chat-screen');
+const nameInput = document.getElementById('name');
 const usernameInput = document.getElementById('username');
+const passwordInput = document.getElementById('password');
 const roomInput = document.getElementById('room');
-const joinBtn = document.getElementById('join-btn');
+const nameGroup = document.getElementById('name-group');
+const showLoginBtn = document.getElementById('show-login-btn');
+const showSignupBtn = document.getElementById('show-signup-btn');
+const authSubmitBtn = document.getElementById('auth-submit-btn');
+const authMessage = document.getElementById('auth-message');
 const leaveBtn = document.getElementById('leave-btn');
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
@@ -21,37 +27,123 @@ const typingIndicator = document.getElementById('typing-indicator');
 const userCount = document.getElementById('user-count');
 const activeMembers = document.getElementById('active-members');
 
-joinBtn.addEventListener('click', joinChat);
-usernameInput.addEventListener('keypress', (event) => {
-    if (event.key === 'Enter') joinChat();
-});
-roomInput.addEventListener('keypress', (event) => {
-    if (event.key === 'Enter') joinChat();
+let authMode = 'login';
+
+showLoginBtn.addEventListener('click', () => setAuthMode('login'));
+showSignupBtn.addEventListener('click', () => setAuthMode('signup'));
+authSubmitBtn.addEventListener('click', submitAuthForm);
+
+[nameInput, usernameInput, passwordInput, roomInput].forEach((input) => {
+    input.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') submitAuthForm();
+    });
 });
 
-function joinChat() {
+function setAuthMode(mode) {
+    authMode = mode;
+    const isSignup = mode === 'signup';
+
+    showLoginBtn.classList.toggle('active', !isSignup);
+    showSignupBtn.classList.toggle('active', isSignup);
+    nameGroup.classList.toggle('hidden', !isSignup);
+    authSubmitBtn.textContent = isSignup ? 'Create Account' : 'Log In';
+    passwordInput.autocomplete = isSignup ? 'new-password' : 'current-password';
+    authMessage.textContent = '';
+    authMessage.className = 'auth-message';
+}
+
+async function submitAuthForm() {
+    const name = nameInput.value.trim();
     const username = usernameInput.value.trim();
+    const password = passwordInput.value.trim();
     const room = roomInput.value.trim() || 'General';
+    const isSignup = authMode === 'signup';
 
-    if (!username) {
-        usernameInput.focus();
+    if (isSignup && !name) {
+        showAuthMessage('Please enter your name.', true);
+        nameInput.focus();
         return;
     }
 
-    currentUser = username;
-    currentRoom = room;
+    if (!username || !password) {
+        showAuthMessage('Please enter username and password.', true);
+        if (!username) {
+            usernameInput.focus();
+        } else {
+            passwordInput.focus();
+        }
+        return;
+    }
+
+    authSubmitBtn.disabled = true;
+    authSubmitBtn.textContent = isSignup ? 'Creating...' : 'Logging in...';
+    showAuthMessage('');
+
+    try {
+        const endpoint = isSignup ? '/api/auth/signup' : '/api/auth/login';
+        const payload = isSignup
+            ? { name, username, password }
+            : { username, password };
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            showAuthMessage(result.message || 'Something went wrong. Please try again.', true);
+            return;
+        }
+
+        showAuthMessage(result.message || (isSignup ? 'Signup successful.' : 'Login successful.'));
+
+        if (isSignup) {
+            setAuthMode('login');
+            passwordInput.value = '';
+            passwordInput.focus();
+            return;
+        }
+
+        currentUser = username;
+        currentRoom = room;
+        enterChat();
+    } catch (error) {
+        showAuthMessage('Unable to connect right now. Please try again.', true);
+    } finally {
+        authSubmitBtn.disabled = false;
+        authSubmitBtn.textContent = authMode === 'signup' ? 'Create Account' : 'Log In';
+    }
+}
+
+function showAuthMessage(message, isError = false) {
+    authMessage.textContent = message;
+    if (!message) {
+        authMessage.className = 'auth-message';
+        return;
+    }
+
+    authMessage.className = `auth-message${isError ? ' error' : ' success'}`;
+}
+
+function enterChat() {
     messages.innerHTML = '';
     typingIndicator.textContent = '';
 
-    socket.emit('join', { username, room });
+    socket.emit('join', { username: currentUser, room: currentRoom });
 
     loginScreen.classList.remove('active');
     chatScreen.classList.add('active');
 
-    roomTitle.textContent = room;
-    chatRoomHeading.textContent = room;
-    currentUserSpan.textContent = username;
-    sidebarAvatar.textContent = username.charAt(0).toUpperCase();
+    roomTitle.textContent = currentRoom;
+    chatRoomHeading.textContent = currentRoom;
+    currentUserSpan.textContent = currentUser;
+    sidebarAvatar.textContent = currentUser.charAt(0).toUpperCase();
+    window.location.hash = 'chat';
 
     messageInput.focus();
 }
