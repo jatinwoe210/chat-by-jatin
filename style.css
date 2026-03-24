@@ -1,18 +1,18 @@
 :root {
-    --bg-primary: #0b141a;
-    --bg-secondary: #111b21;
-    --bg-sidebar: #202c33;
-    --bg-surface: #f0f2f5;
-    --bg-chat: #efeae2;
-    --bubble-incoming: #ffffff;
-    --bubble-outgoing: #d9fdd3;
-    --accent: #00a884;
-    --accent-dark: #008069;
-    --text-primary: #111b21;
-    --text-secondary: #54656f;
-    --text-light: #8696a0;
+    --bg-primary: #0e1621;
+    --bg-secondary: #17212b;
+    --bg-sidebar: #17212b;
+    --bg-surface: #0f1720;
+    --bg-chat: #0f1720;
+    --bubble-incoming: #182533;
+    --bubble-outgoing: #2b5278;
+    --accent: #5288c1;
+    --accent-dark: #3f74aa;
+    --text-primary: #ffffff;
+    --text-secondary: #b8c7d8;
+    --text-light: #7f91a4;
     --border: rgba(255, 255, 255, 0.08);
-    --shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+    --shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
 }
 
 * {
@@ -24,8 +24,7 @@
 body {
     min-height: 100vh;
     font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background:
-        linear-gradient(180deg, #00a884 0 16%, #111b21 16% 100%);
+    background: #0e1621;
     color: var(--text-primary);
 }
 
@@ -40,6 +39,7 @@ input {
     align-items: center;
     justify-content: center;
     padding: 24px;
+    background: #0e1621;
 }
 
 .chat-container {
@@ -64,146 +64,64 @@ input {
     align-items: center;
     justify-content: center;
     padding: 40px;
-    background:
-        radial-gradient(circle at top left, rgba(0, 168, 132, 0.18), transparent 35%),
-        linear-gradient(135deg, #0f1f26, #111b21 55%, #15252d);
-}
-
-.login-card {
-    width: min(1100px, 100%);
-    min-height: 640px;
-    border-radius: 28px;
-    overflow: hidden;
-    display: grid;
-    grid-template-columns: 1.15fr 0.85fr;
-    background: rgba(17, 27, 33, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.login-hero {
-    padding: 56px;
-    color: #f7fffb;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 20px;
-    background:
-        linear-gradient(145deg, rgba(0, 168, 132, 0.18), rgba(32, 44, 51, 0.2)),
-        linear-gradient(160deg, #0f1f26 0%, #15242c 100%);
-}
-
-.hero-badge {
-    display: inline-flex;
-    align-items: center;
-    width: fit-content;
-    padding: 10px 16px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #dffcf4;
-    font-size: 14px;
-    letter-spacing: 0.02em;
-}
-
-.login-hero h1 {
-    font-size: clamp(2.4rem, 5vw, 4.4rem);
-    line-height: 1.05;
-    max-width: 10ch;
-}
-
-.login-hero p {
-    max-width: 540px;
-    font-size: 1.05rem;
-    color: rgba(247, 255, 251, 0.78);
-    line-height: 1.7;
-}
-
-.hero-highlights {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 8px;
-}
-
-.hero-highlights span {
-    padding: 10px 16px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #d6f9ef;
-    font-size: 14px;
+    background: #0e1621;
 }
 
 .login-panel {
-    padding: 56px 42px;
-    background: #f7f8fa;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
-.login-branding {
+    width: min(420px, 100%);
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    margin-bottom: 20px;
-    gap: 10px;
+    gap: 14px;
 }
 
 .login-logo {
-    width: clamp(60px, 12vw, 80px);
-    height: auto;
+    width: clamp(130px, 23vw, 180px);
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    object-fit: cover;
     display: block;
+    margin-bottom: 12px;
+    border: 3px solid rgba(255, 255, 255, 0.18);
 }
 
-.login-panel h2 {
-    font-size: 2rem;
-    margin-bottom: 8px;
-}
-
-.login-panel .login-welcome {
-    margin: 0;
-    font-size: 1.35rem;
-    color: var(--text-primary);
-}
-
-.login-panel > p {
-    color: var(--text-secondary);
-    margin-bottom: 28px;
+.login-title {
+    font-size: clamp(1.5rem, 3vw, 1.8rem);
+    font-weight: 500;
+    color: #ffffff;
+    margin-bottom: 10px;
 }
 
 .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 18px;
-}
-
-.form-group label {
-    font-size: 0.92rem;
-    font-weight: 600;
-    color: var(--text-secondary);
+    width: 100%;
 }
 
 .form-group input {
     width: 100%;
-    padding: 16px 18px;
-    border-radius: 14px;
-    border: 1px solid #d5dbe0;
-    background: white;
+    padding: 15px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    background: #17212b;
+    color: #ffffff;
     transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input::placeholder {
+    color: #8d9fb3;
 }
 
 .form-group input:focus,
 #message-input:focus {
     outline: none;
-    border-color: rgba(0, 168, 132, 0.7);
-    box-shadow: 0 0 0 4px rgba(0, 168, 132, 0.12);
+    border-color: rgba(82, 136, 193, 0.9);
+    box-shadow: 0 0 0 4px rgba(82, 136, 193, 0.18);
 }
 
 #join-btn,
 #send-btn {
     border: none;
-    border-radius: 999px;
+    border-radius: 12px;
     background: var(--accent);
     color: white;
     cursor: pointer;
@@ -212,9 +130,10 @@ input {
 
 #join-btn {
     margin-top: 8px;
-    padding: 16px 24px;
+    width: min(220px, 100%);
+    padding: 14px 22px;
     font-weight: 700;
-    box-shadow: 0 16px 28px rgba(0, 168, 132, 0.22);
+    box-shadow: 0 12px 22px rgba(82, 136, 193, 0.25);
 }
 
 #join-btn:hover,
@@ -247,7 +166,7 @@ input {
 }
 
 .sidebar-header {
-    background: #202c33;
+    background: #17212b;
     border-bottom: 1px solid var(--border);
 }
 
@@ -275,13 +194,13 @@ input {
 }
 
 .profile-avatar {
-    background: linear-gradient(135deg, #25d366, #00a884);
+    background: linear-gradient(135deg, #5682a3, #5288c1);
     color: white;
 }
 
 .ghost-btn {
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
     color: #e9edef;
     padding: 10px 14px;
     border-radius: 999px;
@@ -295,8 +214,8 @@ input {
 
 .search-pill {
     border-radius: 10px;
-    background: #111b21;
-    color: #8696a0;
+    background: #0f1720;
+    color: #8da0b3;
     padding: 13px 16px;
     font-size: 0.94rem;
 }
@@ -351,8 +270,8 @@ input {
 .room-badge {
     border-radius: 999px;
     padding: 8px 12px;
-    background: rgba(37, 211, 102, 0.12);
-    color: #7ff0b0;
+    background: rgba(82, 136, 193, 0.2);
+    color: #bad4f1;
     font-size: 0.8rem;
     font-weight: 700;
 }
@@ -384,8 +303,8 @@ input {
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: #25d366;
-    box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.16);
+    background: #56c970;
+    box-shadow: 0 0 0 3px rgba(86, 201, 112, 0.16);
 }
 
 .user-meta {
@@ -415,12 +334,12 @@ input {
 }
 
 .chat-header {
-    background: #f0f2f5;
-    border-bottom: 1px solid rgba(17, 27, 33, 0.08);
+    background: #17212b;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .chat-kicker {
-    color: var(--text-secondary);
+    color: var(--text-light);
     font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -443,7 +362,7 @@ input {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #25d366;
+    background: #56c970;
 }
 
 .messages-container {
@@ -457,10 +376,7 @@ input {
 .chat-watermark {
     position: absolute;
     inset: 0;
-    background:
-        linear-gradient(rgba(239, 234, 226, 0.9), rgba(239, 234, 226, 0.9)),
-        radial-gradient(circle at 20px 20px, rgba(17, 27, 33, 0.03) 2px, transparent 0);
-    background-size: auto, 32px 32px;
+    background: linear-gradient(rgba(15, 23, 32, 0.96), rgba(15, 23, 32, 0.96));
     pointer-events: none;
 }
 
@@ -493,12 +409,12 @@ input {
     width: 34px;
     height: 34px;
     font-size: 0.84rem;
-    background: #dfe5e7;
+    background: #23384d;
     color: var(--text-primary);
 }
 
 .message.own .message-avatar {
-    background: linear-gradient(135deg, #25d366, #00a884);
+    background: linear-gradient(135deg, #5682a3, #5288c1);
     color: white;
 }
 
@@ -506,7 +422,7 @@ input {
     background: var(--bubble-incoming);
     padding: 10px 12px 8px;
     border-radius: 14px 14px 14px 4px;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
     min-width: 180px;
 }
 
@@ -526,22 +442,22 @@ input {
 .message-username {
     font-size: 0.88rem;
     font-weight: 700;
-    color: #005c4b;
+    color: #8ec5ff;
 }
 
 .message.own .message-username {
-    color: #0b5f53;
+    color: #cce6ff;
 }
 
 .message-time {
     font-size: 0.72rem;
-    color: #667781;
+    color: #9db0c2;
     white-space: nowrap;
 }
 
 .message-text {
     line-height: 1.5;
-    color: #111b21;
+    color: #eef5ff;
     word-break: break-word;
 }
 
@@ -549,10 +465,10 @@ input {
     align-self: center;
     padding: 8px 14px;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.7);
-    color: #54656f;
+    background: rgba(255, 255, 255, 0.1);
+    color: #c3d2e3;
     font-size: 0.84rem;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
 }
 
 #typing-indicator {
@@ -560,7 +476,7 @@ input {
     z-index: 1;
     min-height: 28px;
     padding: 8px 0 0 46px;
-    color: #54656f;
+    color: #9db0c2;
     font-size: 0.9rem;
     font-style: italic;
 }
@@ -570,8 +486,8 @@ input {
     align-items: center;
     gap: 12px;
     padding: 14px 18px 18px;
-    background: #f0f2f5;
-    border-top: 1px solid rgba(17, 27, 33, 0.08);
+    background: #17212b;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .composer-icon {
@@ -579,22 +495,33 @@ input {
     height: 46px;
     border: none;
     border-radius: 50%;
-    background: white;
+    background: #1f2d3a;
+    color: #dbe9f8;
     cursor: pointer;
     font-size: 1.2rem;
 }
 
 #message-input {
     flex: 1;
-    border: 1px solid #d1d7db;
-    background: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: #1f2d3a;
+    color: #ffffff;
     padding: 14px 18px;
     border-radius: 999px;
+}
+
+#message-input::placeholder {
+    color: #8ea0b3;
 }
 
 #send-btn {
     padding: 14px 22px;
     font-weight: 700;
+}
+
+#send-btn:hover,
+#join-btn:hover {
+    background: var(--accent-dark);
 }
 
 @keyframes slideIn {
@@ -619,18 +546,8 @@ input {
         border-radius: 0;
     }
 
-    .login-card {
-        grid-template-columns: 1fr;
-        min-height: 100vh;
-        border-radius: 0;
-    }
-
-    .login-hero {
-        padding: 40px 28px 18px;
-    }
-
-    .login-hero h1 {
-        max-width: 14ch;
+    #login-screen {
+        padding: 30px 24px;
     }
 
     #chat-screen {
@@ -653,20 +570,10 @@ input {
 
 @media (max-width: 640px) {
     #login-screen,
-    .login-panel,
     .messages-container,
     .message-input-container {
         padding-left: 16px;
         padding-right: 16px;
-    }
-
-    .login-panel {
-        padding-top: 24px;
-        padding-bottom: 32px;
-    }
-
-    .login-branding {
-        margin-bottom: 18px;
     }
 
     .sidebar-header,
