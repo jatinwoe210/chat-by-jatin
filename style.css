@@ -1,3 +1,9 @@
+html,
+body {
+    width: 100%;
+    height: 100%;
+}
+
 :root {
     --bg-primary: #0e1621;
     --bg-secondary: #17212b;
@@ -22,9 +28,17 @@
 }
 
 body {
-    min-height: 100vh;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: #0e1621;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     color: var(--text-primary);
 }
 
@@ -34,17 +48,19 @@ input {
 }
 
 .app-shell {
-    min-height: 100vh;
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    padding: clamp(8px, 2.2vw, 24px);
     background: #0e1621;
 }
 
 .chat-container {
     width: min(1380px, 100%);
-    height: min(92vh, 920px);
+    height: min(100%, 920px);
+    max-height: 100%;
     border-radius: 18px;
     overflow: hidden;
     box-shadow: var(--shadow);
@@ -63,21 +79,22 @@ input {
 #login-screen {
     align-items: center;
     justify-content: center;
-    padding: 40px;
+    padding: clamp(16px, 4vh, 40px);
     background: #0e1621;
 }
 
 .login-panel {
     width: min(420px, 100%);
+    max-height: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 14px;
+    gap: clamp(8px, 1.6vh, 14px);
 }
 
 .login-logo {
-    width: clamp(130px, 23vw, 180px);
+    width: clamp(88px, 20vw, 180px);
     aspect-ratio: 1 / 1;
     border-radius: 50%;
     object-fit: cover;
@@ -141,7 +158,7 @@ input {
 
 .form-group input {
     width: 100%;
-    padding: 15px 16px;
+    padding: clamp(10px, 1.8vh, 15px) 16px;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.24);
     background: #17212b;
@@ -173,7 +190,7 @@ input {
 #auth-submit-btn {
     margin-top: 8px;
     width: min(220px, 100%);
-    padding: 14px 22px;
+    padding: clamp(10px, 1.8vh, 14px) 22px;
     font-weight: 700;
     box-shadow: 0 12px 22px rgba(82, 136, 193, 0.25);
 }
@@ -605,7 +622,7 @@ input {
 
     .chat-container {
         width: 100%;
-        height: 100vh;
+        height: 100%;
         border-radius: 0;
     }
 
@@ -628,6 +645,24 @@ input {
 
     .message {
         max-width: 88%;
+    }
+}
+
+@media (max-height: 720px) {
+    .login-logo {
+        width: clamp(78px, 16vh, 130px);
+    }
+
+    .login-title {
+        font-size: clamp(1.2rem, 3.2vh, 1.6rem);
+    }
+
+    .auth-subtitle {
+        font-size: 0.86rem;
+    }
+
+    .login-panel {
+        gap: 8px;
     }
 }
 
