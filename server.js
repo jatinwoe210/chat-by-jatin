@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const socketIo = require('socket.io');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const admin = require('firebase-admin');
 
 const app = express();
 const server = http.createServer(app);
@@ -76,17 +77,39 @@ const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: true,
-      trim: true
+      trim: true,
+      default: ''
+    },
+    displayName: {
+      type: String,
+      trim: true,
+      default: ''
     },
     username: {
       type: String,
-      required: true,
-      unique: true
+      unique: true,
+      sparse: true,
+      trim: true
     },
     password: {
+      type: String
+    },
+    email: {
       type: String,
-      required: true
+      unique: true,
+      sparse: true,
+      trim: true,
+      lowercase: true
+    },
+    googleUid: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true
+    },
+    authProviders: {
+      type: [String],
+      default: ['local']
     }
   },
   {
@@ -109,14 +132,117 @@ function formatMessage(messageDocument) {
   };
 }
 
+function getFirebaseServiceAccountFromEnv() {
+  const jsonFromEnv = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+
+  if (jsonFromEnv) {
+    try {
+      return JSON.parse(jsonFromEnv);
+    } catch (error) {
+      console.error('Invalid FIREBASE_SERVICE_ACCOUNT_JSON value:', error.message);
+      return null;
+    }
+  }
+
+  const { FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY } = process.env;
+
+  if (!FIREBASE_PROJECT_ID || !FIREBASE_CLIENT_EMAIL || !FIREBASE_PRIVATE_KEY) {
+    return null;
+  }
+
+  return {
+    project_id: FIREBASE_PROJECT_ID,
+    client_email: FIREBASE_CLIENT_EMAIL,
+    private_key: FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+  };
+}
+
+let isFirebaseAdminReady = false;
+
+function initializeFirebaseAdmin() {
+  if (admin.apps.length > 0) {
+    isFirebaseAdminReady = true;
+    return;
+  }
+
+  const serviceAccount = getFirebaseServiceAccountFromEnv();
+
+  if (!serviceAccount) {
+    console.warn('Firebase Admin credentials not found. Google auth endpoints are disabled.');
+    isFirebaseAdminReady = false;
+    return;
+  }
+
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+
+  isFirebaseAdminReady = true;
+}
+
+function ensureFirebaseAdminConfigured() {
+  if (!isFirebaseAdminReady) {
+    throw new Error('Google authentication is not configured on the server.');
+  }
+}
+
+async function verifyGoogleIdToken(idToken) {
+  ensureFirebaseAdminConfigured();
+  return admin.auth().verifyIdToken(idToken);
+}
+
+function upsertAuthProvider(existingProviders, provider) {
+  const providers = Array.isArray(existingProviders) ? [...existingProviders] : [];
+
+  if (!providers.includes(provider)) {
+    providers.push(provider);
+  }
+
+  if (providers.length === 0) {
+    providers.push('local');
+  }
+
+  return providers;
+}
+
 // Serve static files
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
+app.get('/api/config/firebase', (req, res) => {
+  const {
+    FIREBASE_API_KEY,
+    FIREBASE_AUTH_DOMAIN,
+    FIREBASE_PROJECT_ID,
+    FIREBASE_APP_ID,
+    FIREBASE_STORAGE_BUCKET,
+    FIREBASE_MESSAGING_SENDER_ID
+  } = process.env;
+
+  if (!FIREBASE_API_KEY || !FIREBASE_AUTH_DOMAIN || !FIREBASE_PROJECT_ID || !FIREBASE_APP_ID) {
+    return res.status(500).json({
+      success: false,
+      message: 'Firebase web config is not set on the server.'
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    config: {
+      apiKey: FIREBASE_API_KEY,
+      authDomain: FIREBASE_AUTH_DOMAIN,
+      projectId: FIREBASE_PROJECT_ID,
+      appId: FIREBASE_APP_ID,
+      storageBucket: FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: FIREBASE_MESSAGING_SENDER_ID
+    }
+  });
+});
+
 app.post('/api/auth/signup', async (req, res) => {
   const { name, username, password } = req.body;
   const trimmedName = name?.trim();
-  const rawUsername = typeof username === 'string' ? username : '';
+  const rawUsername = typeof username === 'string' ? username.trim() : '';
   const trimmedPassword = password?.trim();
 
   if (!trimmedName || !rawUsername || !trimmedPassword) {
@@ -140,8 +266,10 @@ app.post('/api/auth/signup', async (req, res) => {
 
     await User.create({
       name: trimmedName,
+      displayName: trimmedName,
       username: rawUsername,
-      password: hashedPassword
+      password: hashedPassword,
+      authProviders: ['local']
     });
 
     return res.status(201).json({
@@ -166,7 +294,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
-  const rawUsername = typeof username === 'string' ? username : '';
+  const rawUsername = typeof username === 'string' ? username.trim() : '';
   const trimmedPassword = password?.trim();
 
   if (!rawUsername || !trimmedPassword) {
@@ -179,7 +307,7 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const user = await User.findOne({ username: rawUsername });
 
-    if (!user) {
+    if (!user || !user.password) {
       return res.status(401).json({
         success: false,
         message: 'Invalid username or password.'
@@ -208,6 +336,167 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Unable to log in right now. Please try again.'
+    });
+  }
+});
+
+app.post('/api/auth/google', async (req, res) => {
+  const { idToken } = req.body;
+
+  if (!idToken) {
+    return res.status(400).json({
+      success: false,
+      message: 'Google token is required.'
+    });
+  }
+
+  try {
+    const decodedToken = await verifyGoogleIdToken(idToken);
+    const googleUid = decodedToken.uid;
+    const email = typeof decodedToken.email === 'string' ? decodedToken.email.toLowerCase() : '';
+    const inferredName = decodedToken.name || '';
+
+    let user = await User.findOne({ $or: [{ googleUid }, ...(email ? [{ email }] : [])] });
+    let isNewUser = false;
+
+    if (!user) {
+      user = await User.create({
+        googleUid,
+        email,
+        name: inferredName,
+        displayName: inferredName,
+        authProviders: ['google']
+      });
+      isNewUser = true;
+    } else {
+      user.googleUid = user.googleUid || googleUid;
+      user.email = user.email || email;
+      user.name = user.name || inferredName;
+      user.displayName = user.displayName || inferredName;
+      user.authProviders = upsertAuthProvider(user.authProviders, 'google');
+      await user.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Google login successful.',
+      isNewUser,
+      requiresPassword: !user.password,
+      requiresProfileSetup: !user.username || !user.displayName,
+      user: {
+        uid: user.googleUid,
+        email: user.email,
+        username: user.username,
+        name: user.name,
+        displayName: user.displayName
+      }
+    });
+  } catch (error) {
+    console.error('Google auth failed:', error.message);
+    return res.status(401).json({
+      success: false,
+      message: 'Unable to verify Google sign-in.'
+    });
+  }
+});
+
+app.post('/api/auth/google/set-password', async (req, res) => {
+  const { idToken, password } = req.body;
+  const trimmedPassword = typeof password === 'string' ? password.trim() : '';
+
+  if (!idToken || !trimmedPassword) {
+    return res.status(400).json({
+      success: false,
+      message: 'Google token and password are required.'
+    });
+  }
+
+  if (trimmedPassword.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: 'Password must be at least 6 characters.'
+    });
+  }
+
+  try {
+    const decodedToken = await verifyGoogleIdToken(idToken);
+    const user = await User.findOne({ googleUid: decodedToken.uid });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found for this Google account.'
+      });
+    }
+
+    user.password = await bcrypt.hash(trimmedPassword, SALT_ROUNDS);
+    user.authProviders = upsertAuthProvider(user.authProviders, 'local');
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password saved successfully.'
+    });
+  } catch (error) {
+    console.error('Set password failed:', error.message);
+    return res.status(401).json({
+      success: false,
+      message: 'Unable to save password.'
+    });
+  }
+});
+
+app.post('/api/auth/google/profile', async (req, res) => {
+  const { idToken, username, displayName } = req.body;
+  const rawUsername = typeof username === 'string' ? username.trim() : '';
+  const rawDisplayName = typeof displayName === 'string' ? displayName.trim() : '';
+
+  if (!idToken || !rawUsername || !rawDisplayName) {
+    return res.status(400).json({
+      success: false,
+      message: 'Google token, username, and display name are required.'
+    });
+  }
+
+  try {
+    const decodedToken = await verifyGoogleIdToken(idToken);
+    const user = await User.findOne({ googleUid: decodedToken.uid });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found for this Google account.'
+      });
+    }
+
+    const existingUsername = await User.findOne({ username: rawUsername }).lean();
+    if (existingUsername && existingUsername._id.toString() !== user._id.toString()) {
+      return res.status(409).json({
+        success: false,
+        message: 'Username already exists.'
+      });
+    }
+
+    user.username = rawUsername;
+    user.displayName = rawDisplayName;
+    user.name = user.name || rawDisplayName;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile setup completed.',
+      user: {
+        username: user.username,
+        displayName: user.displayName,
+        email: user.email,
+        uid: user.googleUid
+      }
+    });
+  } catch (error) {
+    console.error('Profile setup failed:', error.message);
+    return res.status(401).json({
+      success: false,
+      message: 'Unable to save profile details.'
     });
   }
 });
@@ -309,6 +598,8 @@ io.on('connection', (socket) => {
 
 async function startServer() {
   try {
+    initializeFirebaseAdmin();
+
     await mongoose.connect(MONGODB_URI, {
       serverSelectionTimeoutMS: 10000
     });
@@ -317,7 +608,7 @@ async function startServer() {
       console.log(`Server running on http://0.0.0.0:${PORT}`);
     });
   } catch (error) {
-    console.error('Failed to connect to MongoDB Atlas:', error.message);
+    console.error('Failed to start server:', error.message);
     process.exit(1);
   }
 }

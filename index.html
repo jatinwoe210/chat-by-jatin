@@ -37,11 +37,44 @@
                                 </svg>
                             </button>
                         </div>
-
                     </div>
 
                     <p id="auth-message" class="auth-message" aria-live="polite"></p>
                     <button id="auth-submit-btn">Log In</button>
+
+                    <div class="auth-divider" aria-hidden="true"><span>or</span></div>
+                    <button id="google-auth-btn" class="google-btn" type="button">Continue with Google</button>
+                </div>
+            </div>
+
+            <div id="password-setup-screen" class="screen">
+                <div class="login-panel">
+                    <h1 class="login-title">Set your password</h1>
+                    <p class="auth-subtitle">You're new here. Add a password so you can also log in with credentials.</p>
+                    <div class="auth-form">
+                        <div class="form-group">
+                            <input type="password" id="google-password" placeholder="Create password" maxlength="50" autocomplete="new-password">
+                        </div>
+                    </div>
+                    <p id="google-password-message" class="auth-message" aria-live="polite"></p>
+                    <button id="google-password-submit-btn">Save Password</button>
+                </div>
+            </div>
+
+            <div id="profile-setup-screen" class="screen">
+                <div class="login-panel">
+                    <h1 class="login-title">Profile Setup</h1>
+                    <p class="auth-subtitle">Choose a unique username and display name.</p>
+                    <div class="auth-form">
+                        <div class="form-group">
+                            <input type="text" id="profile-username" placeholder="Unique username" maxlength="30" autocomplete="username">
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="profile-display-name" placeholder="Display name" maxlength="30" autocomplete="name">
+                        </div>
+                    </div>
+                    <p id="profile-message" class="auth-message" aria-live="polite"></p>
+                    <button id="profile-submit-btn">Save Profile</button>
                 </div>
             </div>
 
@@ -100,6 +133,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>

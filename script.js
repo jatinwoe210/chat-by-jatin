@@ -1,9 +1,25 @@
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js';
+
 const socket = io();
 
 let currentUser = '';
+let authMode = 'login';
+let firebaseAuth;
+let googleProvider;
+const pendingGoogleSession = {
+    idToken: '',
+    email: '',
+    uid: ''
+};
 
-const loginScreen = document.getElementById('login-screen');
-const chatScreen = document.getElementById('chat-screen');
+const screens = {
+    login: document.getElementById('login-screen'),
+    passwordSetup: document.getElementById('password-setup-screen'),
+    profileSetup: document.getElementById('profile-setup-screen'),
+    chat: document.getElementById('chat-screen')
+};
+
 const nameInput = document.getElementById('name');
 const usernameInput = document.getElementById('username');
 const passwordInput = document.getElementById('password');
@@ -14,6 +30,17 @@ const showLoginBtn = document.getElementById('show-login-btn');
 const showSignupBtn = document.getElementById('show-signup-btn');
 const authSubmitBtn = document.getElementById('auth-submit-btn');
 const authMessage = document.getElementById('auth-message');
+const googleAuthBtn = document.getElementById('google-auth-btn');
+
+const googlePasswordInput = document.getElementById('google-password');
+const googlePasswordSubmitBtn = document.getElementById('google-password-submit-btn');
+const googlePasswordMessage = document.getElementById('google-password-message');
+
+const profileUsernameInput = document.getElementById('profile-username');
+const profileDisplayNameInput = document.getElementById('profile-display-name');
+const profileSubmitBtn = document.getElementById('profile-submit-btn');
+const profileMessage = document.getElementById('profile-message');
+
 const leaveBtn = document.getElementById('leave-btn');
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
@@ -25,18 +52,30 @@ const typingIndicator = document.getElementById('typing-indicator');
 const userCount = document.getElementById('user-count');
 const activeMembers = document.getElementById('active-members');
 
-let authMode = 'login';
 const eyeIconPath = 'M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z';
 const eyeSlashIconPath = 'M2.71 3.93 1.39 5.34l3.03 3.03A11.58 11.58 0 0 0 1 12c1.73 3.89 6 7 11 7 2.1 0 4.08-.55 5.78-1.5l3.83 3.83 1.41-1.41L2.71 3.93ZM7.53 11.48l1.57 1.57A3 3 0 0 1 9 12a3 3 0 0 1 .03-.52l-1.5-1.5a2.99 2.99 0 0 0 0 1.5ZM12 7c2.76 0 5 2.24 5 5 0 .81-.19 1.57-.53 2.24l1.46 1.46A6.9 6.9 0 0 0 19 12c0-3.87-3.13-7-7-7-.99 0-1.94.21-2.8.58l1.63 1.63c.37-.13.76-.21 1.17-.21Zm9 5c-.58-1.29-1.43-2.46-2.47-3.42l-1.43 1.43A9.95 9.95 0 0 1 18.89 12c-1.52 3.06-3.95 5-6.89 5-.89 0-1.73-.18-2.51-.5L7.9 14.91A4.98 4.98 0 0 0 12 17c5 0 9.27-3.11 11-7Z';
 
 showLoginBtn.addEventListener('click', () => setAuthMode('login'));
 showSignupBtn.addEventListener('click', () => setAuthMode('signup'));
 authSubmitBtn.addEventListener('click', submitAuthForm);
+googleAuthBtn.addEventListener('click', beginGoogleSignIn);
 togglePasswordBtn.addEventListener('click', togglePasswordVisibility);
+googlePasswordSubmitBtn.addEventListener('click', submitGooglePassword);
+profileSubmitBtn.addEventListener('click', submitGoogleProfile);
 
 [nameInput, usernameInput, passwordInput].forEach((input) => {
     input.addEventListener('keypress', (event) => {
         if (event.key === 'Enter') submitAuthForm();
+    });
+});
+
+googlePasswordInput.addEventListener('keypress', (event) => {
+    if (event.key === 'Enter') submitGooglePassword();
+});
+
+[profileUsernameInput, profileDisplayNameInput].forEach((input) => {
+    input.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') submitGoogleProfile();
     });
 });
 
@@ -49,13 +88,35 @@ function setAuthMode(mode) {
     nameGroup.classList.toggle('hidden', !isSignup);
     authSubmitBtn.textContent = isSignup ? 'Create Account' : 'Log In';
     passwordInput.autocomplete = isSignup ? 'new-password' : 'current-password';
-    authMessage.textContent = '';
-    authMessage.className = 'auth-message';
+    showAuthMessage('');
+}
+
+function showScreen(screenName) {
+    Object.values(screens).forEach((screen) => screen.classList.remove('active'));
+    screens[screenName].classList.add('active');
+}
+
+async function postJson(endpoint, payload) {
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Request failed.');
+    }
+
+    return result;
 }
 
 async function submitAuthForm() {
     const name = nameInput.value.trim();
-    const username = usernameInput.value;
+    const username = usernameInput.value.trim();
     const password = passwordInput.value.trim();
     const isSignup = authMode === 'signup';
 
@@ -81,24 +142,8 @@ async function submitAuthForm() {
 
     try {
         const endpoint = isSignup ? '/api/auth/signup' : '/api/auth/login';
-        const payload = isSignup
-            ? { name, username, password }
-            : { username, password };
-
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        const result = await response.json();
-
-        if (!response.ok || !result.success) {
-            showAuthMessage(result.message || 'Something went wrong. Please try again.', true);
-            return;
-        }
+        const payload = isSignup ? { name, username, password } : { username, password };
+        const result = await postJson(endpoint, payload);
 
         showAuthMessage(result.message || (isSignup ? 'Signup successful.' : 'Login successful.'));
 
@@ -112,21 +157,146 @@ async function submitAuthForm() {
         currentUser = username;
         enterChat();
     } catch (error) {
-        showAuthMessage('Unable to connect right now. Please try again.', true);
+        showAuthMessage(error.message || 'Unable to connect right now. Please try again.', true);
     } finally {
         authSubmitBtn.disabled = false;
         authSubmitBtn.textContent = authMode === 'signup' ? 'Create Account' : 'Log In';
     }
 }
 
-function showAuthMessage(message, isError = false) {
-    authMessage.textContent = message;
-    if (!message) {
-        authMessage.className = 'auth-message';
+async function beginGoogleSignIn() {
+    googleAuthBtn.disabled = true;
+    googleAuthBtn.textContent = 'Opening Google...';
+    showAuthMessage('');
+
+    try {
+        await ensureFirebaseReady();
+        const authResult = await signInWithPopup(firebaseAuth, googleProvider);
+        const idToken = await authResult.user.getIdToken(true);
+
+        pendingGoogleSession.idToken = idToken;
+        pendingGoogleSession.email = authResult.user.email || '';
+        pendingGoogleSession.uid = authResult.user.uid;
+
+        const result = await postJson('/api/auth/google', { idToken });
+
+        if (result.requiresPassword) {
+            showScreen('passwordSetup');
+            googlePasswordInput.value = '';
+            googlePasswordInput.focus();
+            return;
+        }
+
+        if (result.requiresProfileSetup) {
+            openProfileSetup(result.user);
+            return;
+        }
+
+        currentUser = result.user.username;
+        enterChat();
+    } catch (error) {
+        showAuthMessage(error.message || 'Google sign-in failed. Please try again.', true);
+    } finally {
+        googleAuthBtn.disabled = false;
+        googleAuthBtn.textContent = 'Continue with Google';
+    }
+}
+
+async function ensureFirebaseReady() {
+    if (firebaseAuth && googleProvider) {
         return;
     }
 
-    authMessage.className = `auth-message${isError ? ' error' : ' success'}`;
+    const response = await fetch('/api/config/firebase');
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Firebase is not configured on server.');
+    }
+
+    const app = initializeApp(result.config);
+    firebaseAuth = getAuth(app);
+    googleProvider = new GoogleAuthProvider();
+}
+
+async function submitGooglePassword() {
+    const password = googlePasswordInput.value.trim();
+
+    if (password.length < 6) {
+        showInlineMessage(googlePasswordMessage, 'Password must be at least 6 characters.', true);
+        return;
+    }
+
+    googlePasswordSubmitBtn.disabled = true;
+    googlePasswordSubmitBtn.textContent = 'Saving...';
+    showInlineMessage(googlePasswordMessage, '');
+
+    try {
+        await postJson('/api/auth/google/set-password', {
+            idToken: pendingGoogleSession.idToken,
+            password
+        });
+
+        showInlineMessage(googlePasswordMessage, 'Password saved successfully.');
+        openProfileSetup();
+    } catch (error) {
+        showInlineMessage(googlePasswordMessage, error.message || 'Unable to save password.', true);
+    } finally {
+        googlePasswordSubmitBtn.disabled = false;
+        googlePasswordSubmitBtn.textContent = 'Save Password';
+    }
+}
+
+function openProfileSetup(user = {}) {
+    showScreen('profileSetup');
+    profileUsernameInput.value = user.username || '';
+    profileDisplayNameInput.value = user.displayName || user.name || '';
+    showInlineMessage(profileMessage, '');
+    profileUsernameInput.focus();
+}
+
+async function submitGoogleProfile() {
+    const username = profileUsernameInput.value.trim();
+    const displayName = profileDisplayNameInput.value.trim();
+
+    if (!username || !displayName) {
+        showInlineMessage(profileMessage, 'Username and display name are required.', true);
+        return;
+    }
+
+    profileSubmitBtn.disabled = true;
+    profileSubmitBtn.textContent = 'Saving...';
+    showInlineMessage(profileMessage, '');
+
+    try {
+        const result = await postJson('/api/auth/google/profile', {
+            idToken: pendingGoogleSession.idToken,
+            username,
+            displayName
+        });
+
+        currentUser = result.user.username;
+        enterChat();
+    } catch (error) {
+        showInlineMessage(profileMessage, error.message || 'Unable to save profile.', true);
+    } finally {
+        profileSubmitBtn.disabled = false;
+        profileSubmitBtn.textContent = 'Save Profile';
+    }
+}
+
+function showAuthMessage(message, isError = false) {
+    showInlineMessage(authMessage, message, isError);
+}
+
+function showInlineMessage(element, message, isError = false) {
+    element.textContent = message;
+    if (!message) {
+        element.className = 'auth-message';
+        return;
+    }
+
+    element.className = `auth-message${isError ? ' error' : ' success'}`;
 }
 
 function togglePasswordVisibility() {
@@ -145,9 +315,7 @@ function enterChat() {
 
     socket.emit('join', { username: currentUser });
 
-    loginScreen.classList.remove('active');
-    chatScreen.classList.add('active');
-
+    showScreen('chat');
     currentUserSpan.textContent = currentUser;
     sidebarAvatar.textContent = currentUser.charAt(0).toUpperCase();
     window.location.hash = 'chat';
@@ -155,7 +323,11 @@ function enterChat() {
     messageInput.focus();
 }
 
-leaveBtn.addEventListener('click', () => {
+leaveBtn.addEventListener('click', async () => {
+    if (firebaseAuth?.currentUser) {
+        await firebaseAuth.signOut();
+    }
+
     socket.disconnect();
     location.reload();
 });
