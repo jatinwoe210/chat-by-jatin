@@ -7,6 +7,8 @@ const chatScreen = document.getElementById('chat-screen');
 const nameInput = document.getElementById('name');
 const usernameInput = document.getElementById('username');
 const passwordInput = document.getElementById('password');
+const togglePasswordBtn = document.getElementById('toggle-password-btn');
+const passwordEyeIcon = document.getElementById('password-eye-icon');
 const nameGroup = document.getElementById('name-group');
 const showLoginBtn = document.getElementById('show-login-btn');
 const showSignupBtn = document.getElementById('show-signup-btn');
@@ -24,10 +26,13 @@ const userCount = document.getElementById('user-count');
 const activeMembers = document.getElementById('active-members');
 
 let authMode = 'login';
+const eyeIconPath = 'M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z';
+const eyeSlashIconPath = 'M2.71 3.93 1.39 5.34l3.03 3.03A11.58 11.58 0 0 0 1 12c1.73 3.89 6 7 11 7 2.1 0 4.08-.55 5.78-1.5l3.83 3.83 1.41-1.41L2.71 3.93ZM7.53 11.48l1.57 1.57A3 3 0 0 1 9 12a3 3 0 0 1 .03-.52l-1.5-1.5a2.99 2.99 0 0 0 0 1.5ZM12 7c2.76 0 5 2.24 5 5 0 .81-.19 1.57-.53 2.24l1.46 1.46A6.9 6.9 0 0 0 19 12c0-3.87-3.13-7-7-7-.99 0-1.94.21-2.8.58l1.63 1.63c.37-.13.76-.21 1.17-.21Zm9 5c-.58-1.29-1.43-2.46-2.47-3.42l-1.43 1.43A9.95 9.95 0 0 1 18.89 12c-1.52 3.06-3.95 5-6.89 5-.89 0-1.73-.18-2.51-.5L7.9 14.91A4.98 4.98 0 0 0 12 17c5 0 9.27-3.11 11-7Z';
 
 showLoginBtn.addEventListener('click', () => setAuthMode('login'));
 showSignupBtn.addEventListener('click', () => setAuthMode('signup'));
 authSubmitBtn.addEventListener('click', submitAuthForm);
+togglePasswordBtn.addEventListener('click', togglePasswordVisibility);
 
 [nameInput, usernameInput, passwordInput].forEach((input) => {
     input.addEventListener('keypress', (event) => {
@@ -122,6 +127,16 @@ function showAuthMessage(message, isError = false) {
     }
 
     authMessage.className = `auth-message${isError ? ' error' : ' success'}`;
+}
+
+function togglePasswordVisibility() {
+    const isVisible = passwordInput.type === 'text';
+    const nextStateIsVisible = !isVisible;
+
+    passwordInput.type = nextStateIsVisible ? 'text' : 'password';
+    togglePasswordBtn.setAttribute('aria-pressed', String(nextStateIsVisible));
+    togglePasswordBtn.setAttribute('aria-label', nextStateIsVisible ? 'Hide password' : 'Show password');
+    passwordEyeIcon.innerHTML = `<path d="${nextStateIsVisible ? eyeSlashIconPath : eyeIconPath}"></path>`;
 }
 
 function enterChat() {

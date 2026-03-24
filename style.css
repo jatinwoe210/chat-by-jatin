@@ -152,6 +152,10 @@ input {
     width: 100%;
 }
 
+.password-group {
+    position: relative;
+}
+
 .hidden {
     display: none;
 }
@@ -164,6 +168,43 @@ input {
     background: #17212b;
     color: #ffffff;
     transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.password-group input {
+    padding-right: 50px;
+}
+
+.password-toggle-btn {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #8d9fb3;
+    cursor: pointer;
+}
+
+.password-toggle-btn:hover {
+    color: #ffffff;
+    background: rgba(82, 136, 193, 0.14);
+}
+
+.password-toggle-btn:focus-visible {
+    outline: 2px solid rgba(82, 136, 193, 0.9);
+    outline-offset: 2px;
+}
+
+#password-eye-icon {
+    width: 19px;
+    height: 19px;
+    fill: currentColor;
 }
 
 .form-group input::placeholder {
