@@ -13,16 +13,33 @@
                 <div class="login-panel">
                     <img src="logo.jpg" alt="Chat By Jatin logo" class="login-logo">
                     <h1 class="login-title">Chat by Jatin</h1>
+                    <p class="auth-subtitle">Create an account or log in to continue</p>
 
-                    <div class="form-group">
-                        <input type="text" id="username" placeholder="Name" maxlength="20">
+                    <div class="auth-toggle" role="tablist" aria-label="Authentication mode">
+                        <button id="show-login-btn" class="auth-toggle-btn active" type="button">Login</button>
+                        <button id="show-signup-btn" class="auth-toggle-btn" type="button">Sign up</button>
                     </div>
 
-                    <div class="form-group">
-                        <input type="text" id="room" placeholder="Room" maxlength="20">
+                    <div class="auth-form">
+                        <div id="name-group" class="form-group hidden">
+                            <input type="text" id="name" placeholder="Name" maxlength="30" autocomplete="name">
+                        </div>
+
+                        <div class="form-group">
+                            <input type="text" id="username" placeholder="Username" maxlength="20" autocomplete="username">
+                        </div>
+
+                        <div class="form-group">
+                            <input type="password" id="password" placeholder="Password" maxlength="50" autocomplete="current-password">
+                        </div>
+
+                        <div class="form-group">
+                            <input type="text" id="room" placeholder="Room (optional)" maxlength="20">
+                        </div>
                     </div>
 
-                    <button id="join-btn">Start Chatting</button>
+                    <p id="auth-message" class="auth-message" aria-live="polite"></p>
+                    <button id="auth-submit-btn">Log In</button>
                 </div>
             </div>
 
