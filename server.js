@@ -5,7 +5,7 @@ const http = require('http');
 const mongoose = require('mongoose');
 const socketIo = require('socket.io');
 const path = require('path');
-const bcrypt = require('./bcrypt');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const server = http.createServer(app);
