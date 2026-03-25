@@ -59,6 +59,7 @@ const addUserBtn = document.getElementById('add-user-btn');
 const sidebarProfileBtn = document.getElementById('sidebar-profile-btn');
 const profileDrawer = document.getElementById('profile-drawer');
 const closeProfileDrawerBtn = document.getElementById('close-profile-drawer-btn');
+const drawerLogoutBtn = document.getElementById('drawer-logout-btn');
 
 const stickerBtn = document.getElementById('sticker-btn');
 const categoryTabs = Array.from(document.querySelectorAll('.chat-tab'));
@@ -101,6 +102,10 @@ if (addUserBtn) {
     addUserBtn.addEventListener('click', () => {
         addSystemMessage('Add user action will be available soon.');
     });
+}
+
+if (profileDrawer) {
+    profileDrawer.hidden = true;
 }
 
 if (sidebarProfileBtn) {
@@ -398,14 +403,20 @@ function enterChat() {
     messageInput.focus();
 }
 
-leaveBtn.addEventListener('click', async () => {
+async function handleLogout() {
     if (firebaseAuth?.currentUser) {
         await firebaseAuth.signOut();
     }
 
     socket.disconnect();
     location.reload();
-});
+}
+
+leaveBtn.addEventListener('click', handleLogout);
+
+if (drawerLogoutBtn) {
+    drawerLogoutBtn.addEventListener('click', handleLogout);
+}
 
 sendBtn.addEventListener('click', sendMessage);
 messageInput.addEventListener('keypress', (event) => {
