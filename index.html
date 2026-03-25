@@ -84,43 +84,55 @@
             </div>
 
             <div id="chat-screen" class="screen">
-                <main class="conversation-panel mobile-app-shell">
-                    <div class="chat-header glass-panel">
-                        <div class="profile-chip">
-                            <div class="profile-avatar" id="sidebar-avatar">Y</div>
-                            <div>
-                                <p class="chat-kicker">Secure hybrid messenger</p>
-                                <h2 id="current-user">You</h2>
+                <main class="hybrid-layout">
+                    <aside class="sidebar-nav glass-panel" aria-label="Primary navigation">
+                        <button class="bottom-nav-item active" type="button"><span>💬</span><small>Chats</small></button>
+                        <button class="bottom-nav-item" type="button"><span>👥</span><small>Groups</small></button>
+                        <button class="bottom-nav-item" type="button"><span>🔔</span><small>Updates</small></button>
+                        <button class="bottom-nav-item" type="button"><span>⚙️</span><small>Settings</small></button>
+                    </aside>
+
+                    <section class="chat-list-pane glass-panel">
+                        <header class="pane-header">
+                            <div class="profile-chip">
+                                <div class="profile-avatar" id="sidebar-avatar">Y</div>
+                                <div>
+                                    <p class="chat-kicker">Hybrid messenger</p>
+                                    <h2 id="current-user">You</h2>
+                                </div>
                             </div>
+                            <button id="leave-btn" class="ghost-btn">Leave</button>
+                        </header>
+
+                        <div class="chat-category-tabs" role="tablist" aria-label="Chat categories">
+                            <button class="chat-tab active" type="button" data-tab="all">All</button>
+                            <button class="chat-tab" type="button" data-tab="groups">Groups</button>
                         </div>
-                        <button id="leave-btn" class="ghost-btn">Leave</button>
-                    </div>
 
-                    <div class="chat-category-tabs glass-panel" role="tablist" aria-label="Chat categories">
-                        <button class="chat-tab active" type="button" data-tab="all">All</button>
-                        <button class="chat-tab" type="button" data-tab="personal">Personal</button>
-                        <button class="chat-tab" type="button" data-tab="groups">Groups</button>
-                    </div>
+                        <div id="users-list" class="users-list"></div>
+                    </section>
 
-                    <div class="chat-status-inline">
-                        <span class="status-dot"></span>
-                        <span id="active-members">0 participants</span>
-                        <span class="dot-separator">•</span>
-                        <span id="user-count">0 online</span>
-                    </div>
+                    <section class="chat-main-pane">
+                        <div class="chat-status-inline">
+                            <span class="status-dot"></span>
+                            <span id="active-members">0 participants</span>
+                            <span class="dot-separator">•</span>
+                            <span id="user-count">0 online</span>
+                        </div>
 
-                    <div class="messages-container">
-                        <div class="chat-watermark"></div>
-                        <div id="messages"></div>
-                        <div id="typing-indicator"></div>
-                    </div>
+                        <div class="messages-container glass-panel">
+                            <div class="chat-watermark"></div>
+                            <div id="messages"></div>
+                            <div id="typing-indicator"></div>
+                        </div>
 
-                    <div class="message-input-container glass-panel">
-                        <button class="composer-icon" type="button" aria-label="Open emoji picker">😊</button>
-                        <input type="text" id="message-input" placeholder="Type a message" maxlength="500">
-                        <button id="sticker-btn" class="sticker-btn" type="button" aria-label="Open sticker panel">🩷</button>
-                        <button id="send-btn">Send</button>
-                    </div>
+                        <div class="message-input-container glass-panel">
+                            <button class="composer-icon" type="button" aria-label="Open emoji picker">😊</button>
+                            <input type="text" id="message-input" placeholder="Type a message" maxlength="500">
+                            <button id="sticker-btn" class="sticker-btn" type="button" aria-label="Open sticker panel">🩷</button>
+                            <button id="send-btn">Send</button>
+                        </div>
+                    </section>
 
                     <nav class="bottom-nav glass-panel" aria-label="Primary navigation">
                         <button class="bottom-nav-item active" type="button"><span>💬</span><small>Chats</small></button>
@@ -128,8 +140,6 @@
                         <button class="bottom-nav-item" type="button"><span>🔔</span><small>Updates</small></button>
                         <button class="bottom-nav-item" type="button"><span>⚙️</span><small>Settings</small></button>
                     </nav>
-
-                    <div id="users-list" class="users-list hidden"></div>
                 </main>
             </div>
         </div>
