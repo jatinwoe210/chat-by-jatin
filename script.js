@@ -108,25 +108,44 @@ if (profileDrawer) {
     profileDrawer.hidden = true;
 }
 
+function openProfileDrawer() {
+    if (!profileDrawer) return;
+    profileDrawer.hidden = false;
+    profileDrawer.classList.add('active');
+}
+
+function closeProfileDrawer() {
+    if (!profileDrawer) return;
+    profileDrawer.classList.remove('active');
+    profileDrawer.hidden = true;
+}
+
 if (sidebarProfileBtn) {
-    sidebarProfileBtn.addEventListener('click', () => {
-        profileDrawer.hidden = false;
-    });
+    sidebarProfileBtn.addEventListener('click', openProfileDrawer);
 }
 
 if (closeProfileDrawerBtn) {
-    closeProfileDrawerBtn.addEventListener('click', () => {
-        profileDrawer.hidden = true;
-    });
+    closeProfileDrawerBtn.onclick = closeProfileDrawer;
 }
 
 if (profileDrawer) {
     profileDrawer.addEventListener('click', (event) => {
         if (event.target === profileDrawer) {
-            profileDrawer.hidden = true;
+            closeProfileDrawer();
         }
     });
 }
+
+document.addEventListener('click', (event) => {
+    if (!profileDrawer || profileDrawer.hidden) return;
+
+    const clickedInsideDrawer = event.target.closest('.profile-drawer');
+    const clickedProfileButton = event.target.closest('#sidebar-profile-btn');
+
+    if (!clickedInsideDrawer && !clickedProfileButton) {
+        closeProfileDrawer();
+    }
+});
 
 [nameInput, usernameInput, passwordInput].forEach((input) => {
     input.addEventListener('keypress', (event) => {
@@ -397,7 +416,7 @@ function enterChat() {
     sidebarAvatar.textContent = currentUser.charAt(0).toUpperCase();
     currentUserAvatar.textContent = currentUser.charAt(0).toUpperCase();
     chatTitle.textContent = 'My Contacts';
-    profileDrawer.hidden = true;
+    closeProfileDrawer();
     window.location.hash = 'chat';
 
     messageInput.focus();
