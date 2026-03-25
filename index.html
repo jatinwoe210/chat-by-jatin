@@ -86,16 +86,25 @@
             <div id="chat-screen" class="screen">
                 <main class="hybrid-layout">
                     <aside class="sidebar-nav glass-panel" aria-label="Primary navigation">
-                        <button class="bottom-nav-item active" type="button"><span>💬</span><small>Chats</small></button>
-                        <button class="bottom-nav-item" type="button"><span>👥</span><small>Groups</small></button>
-                        <button class="bottom-nav-item" type="button"><span>🔔</span><small>Updates</small></button>
-                        <button class="bottom-nav-item" type="button"><span>⚙️</span><small>Settings</small></button>
+                        <div class="sidebar-actions">
+                            <button class="bottom-nav-item active" type="button"><span>💬</span><small>Chats</small></button>
+                            <button class="bottom-nav-item" type="button"><span>👥</span><small>Groups</small></button>
+                            <button class="bottom-nav-item" type="button"><span>🔔</span><small>Updates</small></button>
+                            <button class="bottom-nav-item" type="button"><span>⚙️</span><small>Settings</small></button>
+                        </div>
+                        <button id="sidebar-profile-btn" class="sidebar-profile" type="button" aria-label="Open profile options">
+                            <div class="profile-avatar" id="sidebar-avatar">Y</div>
+                            <div class="sidebar-profile-meta">
+                                <strong id="sidebar-name">Jatin</strong>
+                                <span id="sidebar-email">jatinwoe210@gmail.com</span>
+                            </div>
+                        </button>
                     </aside>
 
                     <section class="chat-list-pane glass-panel">
                         <header class="pane-header">
                             <div class="profile-chip">
-                                <div class="profile-avatar" id="sidebar-avatar">Y</div>
+                                <div class="profile-avatar" id="current-user-avatar">Y</div>
                                 <div>
                                     <p class="chat-kicker">Hybrid messenger</p>
                                     <h2 id="current-user">You</h2>
@@ -113,12 +122,10 @@
                     </section>
 
                     <section class="chat-main-pane">
-                        <div class="chat-status-inline">
-                            <span class="status-dot"></span>
-                            <span id="active-members">0 participants</span>
-                            <span class="dot-separator">•</span>
-                            <span id="user-count">0 online</span>
-                        </div>
+                        <header class="chat-main-header glass-panel">
+                            <h2 id="chat-title">My Contacts</h2>
+                            <button id="add-user-btn" class="icon-btn" type="button" aria-label="Add user">+</button>
+                        </header>
 
                         <div class="messages-container glass-panel">
                             <div class="chat-watermark"></div>
@@ -141,6 +148,18 @@
                         <button class="bottom-nav-item" type="button"><span>⚙️</span><small>Settings</small></button>
                     </nav>
                 </main>
+
+                <div id="profile-drawer" class="profile-drawer-overlay" hidden>
+                    <div class="profile-drawer glass-panel" role="dialog" aria-modal="true" aria-labelledby="profile-drawer-title">
+                        <div class="profile-drawer-header">
+                            <h3 id="profile-drawer-title">Profile Options</h3>
+                            <button id="close-profile-drawer-btn" class="icon-btn close-btn" type="button" aria-label="Close profile options">✕</button>
+                        </div>
+                        <button class="drawer-option" type="button">View WhatsApp Profile</button>
+                        <button class="drawer-option" type="button">View Telegram Profile</button>
+                        <button class="drawer-option" type="button">Account Preferences</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
