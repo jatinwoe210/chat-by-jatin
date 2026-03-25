@@ -84,41 +84,29 @@
             </div>
 
             <div id="chat-screen" class="screen">
-                <aside class="sidebar">
-                    <div class="sidebar-header">
+                <main class="conversation-panel mobile-app-shell">
+                    <div class="chat-header glass-panel">
                         <div class="profile-chip">
                             <div class="profile-avatar" id="sidebar-avatar">Y</div>
                             <div>
-                                <strong id="current-user">You</strong>
-                                <p>Available now</p>
+                                <p class="chat-kicker">Secure hybrid messenger</p>
+                                <h2 id="current-user">You</h2>
                             </div>
                         </div>
                         <button id="leave-btn" class="ghost-btn">Leave</button>
                     </div>
 
-                    <div class="sidebar-search">
-                        <div class="search-pill">🔎 <span>Search or start a new chat</span></div>
+                    <div class="chat-category-tabs glass-panel" role="tablist" aria-label="Chat categories">
+                        <button class="chat-tab active" type="button" data-tab="all">All</button>
+                        <button class="chat-tab" type="button" data-tab="personal">Personal</button>
+                        <button class="chat-tab" type="button" data-tab="groups">Groups</button>
                     </div>
 
-                    <div class="users-panel">
-                        <div class="users-header">
-                            <span>Online users</span>
-                            <span id="user-count">0 online</span>
-                        </div>
-                        <div id="users-list" class="users-list"></div>
-                    </div>
-                </aside>
-
-                <main class="conversation-panel">
-                    <div class="chat-header">
-                        <div>
-                            <p class="chat-kicker">Encrypted-style global chat</p>
-                            <h2>General chat</h2>
-                        </div>
-                        <div class="chat-status">
-                            <span class="status-dot"></span>
-                            <span id="active-members">0 participants</span>
-                        </div>
+                    <div class="chat-status-inline">
+                        <span class="status-dot"></span>
+                        <span id="active-members">0 participants</span>
+                        <span class="dot-separator">•</span>
+                        <span id="user-count">0 online</span>
                     </div>
 
                     <div class="messages-container">
@@ -127,11 +115,21 @@
                         <div id="typing-indicator"></div>
                     </div>
 
-                    <div class="message-input-container">
-                        <button class="composer-icon" type="button" aria-label="Emoji picker">😊</button>
+                    <div class="message-input-container glass-panel">
+                        <button class="composer-icon" type="button" aria-label="Open emoji picker">😊</button>
                         <input type="text" id="message-input" placeholder="Type a message" maxlength="500">
+                        <button id="sticker-btn" class="sticker-btn" type="button" aria-label="Open sticker panel">🩷</button>
                         <button id="send-btn">Send</button>
                     </div>
+
+                    <nav class="bottom-nav glass-panel" aria-label="Primary navigation">
+                        <button class="bottom-nav-item active" type="button"><span>💬</span><small>Chats</small></button>
+                        <button class="bottom-nav-item" type="button"><span>👥</span><small>Groups</small></button>
+                        <button class="bottom-nav-item" type="button"><span>🔔</span><small>Updates</small></button>
+                        <button class="bottom-nav-item" type="button"><span>⚙️</span><small>Settings</small></button>
+                    </nav>
+
+                    <div id="users-list" class="users-list hidden"></div>
                 </main>
             </div>
         </div>
