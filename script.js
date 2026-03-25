@@ -49,10 +49,16 @@ const sendBtn = document.getElementById('send-btn');
 const messages = document.getElementById('messages');
 const usersList = document.getElementById('users-list');
 const currentUserSpan = document.getElementById('current-user');
+const currentUserAvatar = document.getElementById('current-user-avatar');
 const sidebarAvatar = document.getElementById('sidebar-avatar');
+const sidebarName = document.getElementById('sidebar-name');
+const sidebarEmail = document.getElementById('sidebar-email');
 const typingIndicator = document.getElementById('typing-indicator');
-const userCount = document.getElementById('user-count');
-const activeMembers = document.getElementById('active-members');
+const chatTitle = document.getElementById('chat-title');
+const addUserBtn = document.getElementById('add-user-btn');
+const sidebarProfileBtn = document.getElementById('sidebar-profile-btn');
+const profileDrawer = document.getElementById('profile-drawer');
+const closeProfileDrawerBtn = document.getElementById('close-profile-drawer-btn');
 
 const stickerBtn = document.getElementById('sticker-btn');
 const categoryTabs = Array.from(document.querySelectorAll('.chat-tab'));
@@ -90,6 +96,32 @@ bottomNavItems.forEach((item) => {
         item.classList.add('active');
     });
 });
+
+if (addUserBtn) {
+    addUserBtn.addEventListener('click', () => {
+        addSystemMessage('Add user action will be available soon.');
+    });
+}
+
+if (sidebarProfileBtn) {
+    sidebarProfileBtn.addEventListener('click', () => {
+        profileDrawer.hidden = false;
+    });
+}
+
+if (closeProfileDrawerBtn) {
+    closeProfileDrawerBtn.addEventListener('click', () => {
+        profileDrawer.hidden = true;
+    });
+}
+
+if (profileDrawer) {
+    profileDrawer.addEventListener('click', (event) => {
+        if (event.target === profileDrawer) {
+            profileDrawer.hidden = true;
+        }
+    });
+}
 
 [nameInput, usernameInput, passwordInput].forEach((input) => {
     input.addEventListener('keypress', (event) => {
@@ -355,7 +387,12 @@ function enterChat() {
 
     showScreen('chat');
     currentUserSpan.textContent = currentUser;
+    sidebarName.textContent = currentUser;
+    sidebarEmail.textContent = 'jatinwoe210@gmail.com';
     sidebarAvatar.textContent = currentUser.charAt(0).toUpperCase();
+    currentUserAvatar.textContent = currentUser.charAt(0).toUpperCase();
+    chatTitle.textContent = 'My Contacts';
+    profileDrawer.hidden = true;
     window.location.hash = 'chat';
 
     messageInput.focus();
@@ -459,8 +496,6 @@ function addSystemMessage(message) {
 
 function updateUsersList(userList) {
     usersList.innerHTML = '';
-    userCount.textContent = `${userList.length} online`;
-    activeMembers.textContent = `${userList.length} participant${userList.length === 1 ? '' : 's'}`;
 
     userList.forEach((username) => {
         const userDiv = document.createElement('div');

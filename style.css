@@ -318,19 +318,40 @@ input {
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
 }
 
-.chat-status-inline {
+.chat-main-header {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    font-size: 0.84rem;
-    color: var(--text-secondary);
+    justify-content: space-between;
+    border-radius: 18px;
+    padding: 10px 14px;
 }
-.status-dot { width: 10px; height: 10px; border-radius: 50%; background: #65e08e; box-shadow: 0 0 0 3px rgba(101, 224, 142, 0.2); }
-.dot-separator { opacity: 0.6; }
+
+.chat-main-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.icon-btn {
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-btn:hover {
+    background: rgba(107, 168, 255, 0.22);
+}
 
 .messages-container {
     position: relative;
@@ -442,6 +463,91 @@ input {
 .bottom-nav-item span { font-size: 1.05rem; }
 .bottom-nav-item small { font-size: 0.66rem; }
 
+.sidebar-profile {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+}
+
+.sidebar-profile .profile-avatar {
+    width: 42px;
+    height: 42px;
+}
+
+.sidebar-profile-meta {
+    min-width: 0;
+}
+
+.sidebar-profile-meta strong,
+.sidebar-profile-meta span {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-profile-meta strong {
+    font-size: 0.9rem;
+}
+
+.sidebar-profile-meta span {
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+}
+
+.profile-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 9, 18, 0.68);
+    display: flex;
+    justify-content: flex-end;
+    z-index: 20;
+}
+
+.profile-drawer {
+    width: min(360px, 92vw);
+    height: 100%;
+    border-radius: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.18);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.profile-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.close-btn {
+    font-size: 0.9rem;
+}
+
+.drawer-option {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--text-primary);
+    padding: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.drawer-option:hover {
+    background: rgba(107, 168, 255, 0.18);
+}
+
 @keyframes slideIn {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
@@ -463,22 +569,31 @@ input {
 
 @media (min-width: 1024px) {
     .hybrid-layout {
-        grid-template-columns: 72px minmax(280px, 360px) 1fr;
+        grid-template-columns: 220px minmax(280px, 360px) 1fr;
         grid-template-rows: 1fr;
         align-items: stretch;
+        gap: 12px;
+        padding: 12px;
     }
 
     .sidebar-nav {
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        gap: 8px;
+        justify-content: space-between;
+        gap: 14px;
         border-radius: 22px;
-        padding: 10px;
+        padding: 14px 10px 12px;
+    }
+
+    .sidebar-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
     }
 
     .chat-list-pane {
         min-height: 0;
+        padding: 12px;
     }
 
     .users-list {
@@ -488,6 +603,24 @@ input {
 
     .chat-main-pane {
         min-width: 0;
+    }
+
+    .bottom-nav-item {
+        flex-direction: row;
+        justify-content: flex-start;
+        padding: 11px 10px;
+        border-radius: 10px;
+        gap: 10px;
+    }
+
+    .bottom-nav-item span {
+        width: 22px;
+        text-align: center;
+    }
+
+    .bottom-nav-item small {
+        font-size: 0.8rem;
+        font-weight: 600;
     }
 
     .bottom-nav {
