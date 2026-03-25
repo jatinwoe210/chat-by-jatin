@@ -548,6 +548,17 @@ input {
     background: rgba(107, 168, 255, 0.18);
 }
 
+.logout-option {
+    background: rgba(255, 97, 97, 0.14);
+    border-color: rgba(255, 125, 125, 0.35);
+    color: #ffd9d9;
+    font-weight: 700;
+}
+
+.logout-option:hover {
+    background: rgba(255, 97, 97, 0.26);
+}
+
 @keyframes slideIn {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
@@ -582,13 +593,14 @@ input {
         justify-content: space-between;
         gap: 14px;
         border-radius: 22px;
-        padding: 14px 10px 12px;
+        padding: 16px 12px;
     }
 
     .sidebar-actions {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 8px;
+        padding: 2px 0;
     }
 
     .chat-list-pane {
