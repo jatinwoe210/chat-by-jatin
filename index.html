@@ -50,10 +50,15 @@
             <div id="password-setup-screen" class="screen">
                 <div class="login-panel">
                     <h1 class="login-title">Set your password</h1>
-                    <p class="auth-subtitle">You're new here. Add a password so you can also log in with credentials.</p>
+                    <p class="auth-subtitle">You're new here. Add a password so you can also log in with your credentials.</p>
                     <div class="auth-form">
-                        <div class="form-group">
+                        <div class="form-group password-group">
                             <input type="password" id="google-password" placeholder="Create password" maxlength="50" autocomplete="new-password">
+                            <button id="toggle-google-password-btn" class="password-toggle-btn" type="button" aria-label="Show password" aria-pressed="false">
+                                <svg id="google-password-eye-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"></path>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                     <p id="google-password-message" class="auth-message" aria-live="polite"></p>
