@@ -4,6 +4,9 @@ import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstati
 const socket = io();
 
 let currentUser = '';
+let currentUserProfile = { username: '', displayName: '', email: '' };
+let selectedContact = null;
+let contacts = [];
 let authMode = 'login';
 let firebaseAuth;
 let googleProvider;
@@ -43,13 +46,10 @@ const profileDisplayNameInput = document.getElementById('profile-display-name');
 const profileSubmitBtn = document.getElementById('profile-submit-btn');
 const profileMessage = document.getElementById('profile-message');
 
-const leaveBtn = document.getElementById('leave-btn');
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 const messages = document.getElementById('messages');
 const usersList = document.getElementById('users-list');
-const currentUserSpan = document.getElementById('current-user');
-const currentUserAvatar = document.getElementById('current-user-avatar');
 const sidebarAvatar = document.getElementById('sidebar-avatar');
 const sidebarName = document.getElementById('sidebar-name');
 const sidebarEmail = document.getElementById('sidebar-email');
@@ -99,9 +99,7 @@ bottomNavItems.forEach((item) => {
 });
 
 if (addUserBtn) {
-    addUserBtn.addEventListener('click', () => {
-        addSystemMessage('Add user action will be available soon.');
-    });
+    addUserBtn.addEventListener('click', handleAddContact);
 }
 
 if (profileDrawer) {
@@ -239,6 +237,11 @@ async function submitAuthForm() {
         }
 
         currentUser = username;
+        currentUserProfile = {
+            username,
+            displayName: result.user?.displayName || result.user?.name || username,
+            email: result.user?.email || ''
+        };
         enterChat();
     } catch (error) {
         showAuthMessage(error.message || 'Unable to connect right now. Please try again.', true);
@@ -277,6 +280,11 @@ async function beginGoogleSignIn() {
         }
 
         currentUser = result.user.username;
+        currentUserProfile = {
+            username: result.user.username,
+            displayName: result.user.displayName || result.user.name || result.user.username,
+            email: result.user.email || pendingGoogleSession.email || ''
+        };
         enterChat();
     } catch (error) {
         showAuthMessage(error.message || 'Google sign-in failed. Please try again.', true);
@@ -360,6 +368,11 @@ async function submitGoogleProfile() {
         });
 
         currentUser = result.user.username;
+        currentUserProfile = {
+            username: result.user.username,
+            displayName: result.user.displayName || result.user.username,
+            email: result.user.email || pendingGoogleSession.email || ''
+        };
         enterChat();
     } catch (error) {
         showInlineMessage(profileMessage, error.message || 'Unable to save profile.', true);
@@ -406,20 +419,19 @@ function toggleGooglePasswordVisibility() {
 function enterChat() {
     messages.innerHTML = '';
     typingIndicator.textContent = '';
+    selectedContact = null;
 
     socket.emit('join', { username: currentUser });
 
     showScreen('chat');
-    currentUserSpan.textContent = currentUser;
-    sidebarName.textContent = currentUser;
-    sidebarEmail.textContent = 'jatinwoe210@gmail.com';
-    sidebarAvatar.textContent = currentUser.charAt(0).toUpperCase();
-    currentUserAvatar.textContent = currentUser.charAt(0).toUpperCase();
+    const resolvedDisplayName = currentUserProfile.displayName || currentUser;
+    sidebarName.textContent = resolvedDisplayName;
+    sidebarEmail.textContent = currentUserProfile.email || currentUser;
+    sidebarAvatar.textContent = resolvedDisplayName.charAt(0).toUpperCase();
     chatTitle.textContent = 'My Contacts';
     closeProfileDrawer();
     window.location.hash = 'chat';
-
-    messageInput.focus();
+    loadContacts();
 }
 
 async function handleLogout() {
@@ -430,8 +442,6 @@ async function handleLogout() {
     socket.disconnect();
     location.reload();
 }
-
-leaveBtn.addEventListener('click', handleLogout);
 
 if (drawerLogoutBtn) {
     drawerLogoutBtn.addEventListener('click', handleLogout);
@@ -446,24 +456,32 @@ let typingTimer;
 
 function sendMessage() {
     const message = messageInput.value.trim();
-    if (!message) return;
+    if (!message || !selectedContact) return;
 
-    socket.emit('chat message', { message });
+    socket.emit('chat message', { message, toUsername: selectedContact.username });
     messageInput.value = '';
     stopTyping();
 }
 
 messageInput.addEventListener('input', () => {
-    socket.emit('typing', { isTyping: true });
+    if (!selectedContact) {
+        return;
+    }
+
+    socket.emit('typing', { isTyping: true, toUsername: selectedContact.username });
     clearTimeout(typingTimer);
     typingTimer = setTimeout(stopTyping, 1000);
 });
 
 function stopTyping() {
-    socket.emit('typing', { isTyping: false });
+    if (!selectedContact) {
+        return;
+    }
+
+    socket.emit('typing', { isTyping: false, toUsername: selectedContact.username });
 }
 
-socket.on('chat history', (history) => {
+socket.on('conversation history', (history) => {
     messages.innerHTML = '';
 
     history.forEach((message) => {
@@ -479,33 +497,27 @@ socket.on('message error', (errorMessage) => {
     addSystemMessage(errorMessage);
 });
 
-socket.on('user joined', (data) => {
-    addSystemMessage(data.message);
-});
-
-socket.on('user left', (data) => {
-    addSystemMessage(data.message);
-});
-
-socket.on('room users', (userList) => {
-    updateUsersList(userList);
-});
-
 socket.on('user typing', (data) => {
-    typingIndicator.textContent = data.isTyping ? `${data.username} is typing...` : '';
+    if (!selectedContact || data.username !== selectedContact.username) {
+        typingIndicator.textContent = '';
+        return;
+    }
+
+    typingIndicator.textContent = data.isTyping ? `${selectedContact.displayName} is typing...` : '';
 });
 
 function addMessage(data) {
     const messageDiv = document.createElement('div');
-    const isCurrentUser = data.username === currentUser;
-    const avatarInitial = data.username.charAt(0).toUpperCase();
+    const isCurrentUser = data.fromUsername === currentUser;
+    const senderDisplayName = data.fromDisplayName || data.fromUsername;
+    const avatarInitial = senderDisplayName.charAt(0).toUpperCase();
 
     messageDiv.className = `message${isCurrentUser ? ' own' : ''}`;
     messageDiv.innerHTML = `
         <div class="message-avatar">${avatarInitial}</div>
         <div class="message-content">
             <div class="message-header">
-                <span class="message-username">${escapeHtml(data.username)}</span>
+                <span class="message-username">${escapeHtml(senderDisplayName)}</span>
                 <span class="message-time">${escapeHtml(data.timestamp)}</span>
             </div>
             <div class="message-text">${escapeHtml(data.message)}</div>
@@ -527,22 +539,79 @@ function addSystemMessage(message) {
 function updateUsersList(userList) {
     usersList.innerHTML = '';
 
-    userList.forEach((username) => {
+    userList.forEach((contact) => {
         const userDiv = document.createElement('div');
-        const activeClass = username === currentUser ? ' active' : '';
-        const subtitle = username === currentUser ? 'You' : 'Online';
+        const isActive = selectedContact?.username === contact.username;
+        const activeClass = isActive ? ' active' : '';
 
         userDiv.className = `user-item${activeClass}`;
         userDiv.innerHTML = `
             <span class="user-presence"></span>
             <div class="user-meta">
-                <strong>${escapeHtml(username)}</strong>
-                <p>${escapeHtml(subtitle)}</p>
+                <strong>${escapeHtml(contact.displayName)}</strong>
+                <p>@${escapeHtml(contact.username)}</p>
             </div>
         `;
+        userDiv.addEventListener('click', () => selectContact(contact.username));
 
         usersList.appendChild(userDiv);
     });
+}
+
+async function loadContacts() {
+    try {
+        const response = await fetch(`/api/contacts?username=${encodeURIComponent(currentUser)}`);
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || 'Unable to load contacts.');
+        }
+
+        contacts = result.contacts || [];
+        updateUsersList(contacts);
+        messages.innerHTML = '';
+        typingIndicator.textContent = '';
+    } catch (error) {
+        addSystemMessage(error.message || 'Unable to load contacts.');
+    }
+}
+
+async function handleAddContact() {
+    const enteredUsername = window.prompt('Enter username to add:');
+    const contactUsername = enteredUsername ? enteredUsername.trim() : '';
+
+    if (!contactUsername) {
+        return;
+    }
+
+    try {
+        const result = await postJson('/api/contacts/add', {
+            username: currentUser,
+            contactUsername
+        });
+
+        const exists = contacts.some((contact) => contact.username === result.contact.username);
+        if (!exists) {
+            contacts.push(result.contact);
+            contacts.sort((a, b) => a.displayName.localeCompare(b.displayName));
+            updateUsersList(contacts);
+        }
+    } catch (error) {
+        addSystemMessage(error.message || 'Unable to add contact.');
+    }
+}
+
+function selectContact(contactUsername) {
+    const contact = contacts.find((item) => item.username === contactUsername);
+    if (!contact) return;
+
+    selectedContact = contact;
+    chatTitle.textContent = contact.displayName;
+    typingIndicator.textContent = '';
+    messages.innerHTML = '';
+    updateUsersList(contacts);
+    socket.emit('open conversation', { contactUsername: contact.username });
+    messageInput.focus();
 }
 
 function escapeHtml(text) {

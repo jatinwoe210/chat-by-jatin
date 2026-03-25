@@ -55,9 +55,15 @@ const MONGODB_URI = normalizeMongoUri(RAW_MONGODB_URI);
 
 const messageSchema = new mongoose.Schema(
   {
-    username: {
+    fromUsername: {
       type: String,
-      required: true
+      required: true,
+      trim: true
+    },
+    toUsername: {
+      type: String,
+      required: true,
+      trim: true
     },
     message: {
       type: String,
@@ -110,6 +116,10 @@ const userSchema = new mongoose.Schema(
     authProviders: {
       type: [String],
       default: ['local']
+    },
+    contacts: {
+      type: [String],
+      default: []
     }
   },
   {
@@ -123,7 +133,8 @@ function formatMessage(messageDocument) {
   const timestampSource = messageDocument.createdAt || new Date();
 
   return {
-    username: messageDocument.username,
+    fromUsername: messageDocument.fromUsername,
+    toUsername: messageDocument.toUsername,
     message: messageDocument.message,
     timestamp: new Date(timestampSource).toLocaleTimeString([], {
       hour: '2-digit',
@@ -328,7 +339,9 @@ app.post('/api/auth/login', async (req, res) => {
       message: 'Login successful.',
       user: {
         name: user.name,
-        username: user.username
+        username: user.username,
+        displayName: user.displayName,
+        email: user.email
       }
     });
   } catch (error) {
@@ -501,6 +514,110 @@ app.post('/api/auth/google/profile', async (req, res) => {
   }
 });
 
+app.get('/api/contacts', async (req, res) => {
+  const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
+
+  if (!username) {
+    return res.status(400).json({
+      success: false,
+      message: 'Username is required.'
+    });
+  }
+
+  try {
+    const user = await User.findOne({ username }).lean();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.'
+      });
+    }
+
+    const contactsUsernames = (user.contacts || []).filter((contact) => contact && contact !== username);
+    const contacts = await User.find({ username: { $in: contactsUsernames } })
+      .select('username displayName name')
+      .lean();
+
+    const mappedContacts = contacts
+      .map((contact) => ({
+        username: contact.username,
+        displayName: contact.displayName || contact.name || contact.username
+      }))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+    return res.status(200).json({
+      success: true,
+      contacts: mappedContacts
+    });
+  } catch (error) {
+    console.error('Failed to fetch contacts:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to fetch contacts right now.'
+    });
+  }
+});
+
+app.post('/api/contacts/add', async (req, res) => {
+  const requesterUsername = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+  const targetUsername = typeof req.body.contactUsername === 'string' ? req.body.contactUsername.trim() : '';
+
+  if (!requesterUsername || !targetUsername) {
+    return res.status(400).json({
+      success: false,
+      message: 'Username and contact username are required.'
+    });
+  }
+
+  if (requesterUsername === targetUsername) {
+    return res.status(400).json({
+      success: false,
+      message: 'You cannot add yourself as a contact.'
+    });
+  }
+
+  try {
+    const [requester, targetUser] = await Promise.all([
+      User.findOne({ username: requesterUsername }),
+      User.findOne({ username: targetUsername })
+    ]);
+
+    if (!requester) {
+      return res.status(404).json({
+        success: false,
+        message: 'Current user not found.'
+      });
+    }
+
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Username not found.'
+      });
+    }
+
+    if (!requester.contacts.includes(targetUsername)) {
+      requester.contacts.push(targetUsername);
+      await requester.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      contact: {
+        username: targetUser.username,
+        displayName: targetUser.displayName || targetUser.name || targetUser.username
+      }
+    });
+  } catch (error) {
+    console.error('Failed to add contact:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to add contact right now.'
+    });
+  }
+});
+
 // Store users by socket id
 const users = new Map();
 
@@ -526,55 +643,110 @@ io.on('connection', (socket) => {
       return;
     }
 
-    users.set(socket.id, { username });
-
-    try {
-      const previousMessages = await Message.find()
-        .sort({ createdAt: 1 })
-        .lean();
-
-      socket.emit('chat history', previousMessages.map(formatMessage));
-    } catch (error) {
-      console.error('Failed to load chat history:', error.message);
-      socket.emit('chat history', []);
-    }
-
-    socket.broadcast.emit('user joined', {
-      username,
-      message: `${username} joined the chat`
-    });
-
-    io.emit('room users', Array.from(users.values()).map((user) => user.username));
+    users.set(socket.id, { username, activeContact: '' });
   });
 
   socket.on('chat message', async (data) => {
     const user = users.get(socket.id);
+    const toUsername = typeof data?.toUsername === 'string' ? data.toUsername.trim() : '';
     const messageText = data.message?.trim();
 
-    if (!user || !messageText) {
+    if (!user || !toUsername || !messageText) {
       return;
     }
 
     try {
       const savedMessage = await Message.create({
-        username: user.username,
+        fromUsername: user.username,
+        toUsername,
         message: messageText
       });
 
-      io.emit('chat message', formatMessage(savedMessage));
+      const participants = [user.username, toUsername];
+      const usersForNames = await User.find({ username: { $in: participants } })
+        .select('username displayName name')
+        .lean();
+      const nameMap = new Map(
+        usersForNames.map((item) => [item.username, item.displayName || item.name || item.username])
+      );
+
+      const payload = {
+        ...formatMessage(savedMessage),
+        fromDisplayName: nameMap.get(user.username) || user.username,
+        toDisplayName: nameMap.get(toUsername) || toUsername
+      };
+
+      users.forEach((socketUser, socketId) => {
+        const isParticipant = socketUser.username === user.username || socketUser.username === toUsername;
+        if (!isParticipant) return;
+
+        const isActiveConversation =
+          socketUser.activeContact === user.username || socketUser.activeContact === toUsername;
+
+        if (isActiveConversation) {
+          io.to(socketId).emit('chat message', payload);
+        }
+      });
     } catch (error) {
       console.error(`Failed to save message for user "${user.username}":`, error.message);
       socket.emit('message error', 'Unable to send message right now. Please try again.');
     }
   });
 
+  socket.on('open conversation', async (data) => {
+    const user = users.get(socket.id);
+    const contactUsername = typeof data?.contactUsername === 'string' ? data.contactUsername.trim() : '';
+
+    if (!user || !contactUsername) {
+      return;
+    }
+
+    users.set(socket.id, { ...user, activeContact: contactUsername });
+
+    try {
+      const history = await Message.find({
+        $or: [
+          { fromUsername: user.username, toUsername: contactUsername },
+          { fromUsername: contactUsername, toUsername: user.username }
+        ]
+      })
+        .sort({ createdAt: 1 })
+        .lean();
+
+      const participantUsernames = [user.username, contactUsername];
+      const participantUsers = await User.find({ username: { $in: participantUsernames } })
+        .select('username displayName name')
+        .lean();
+      const nameMap = new Map(
+        participantUsers.map((item) => [item.username, item.displayName || item.name || item.username])
+      );
+
+      socket.emit(
+        'conversation history',
+        history.map((message) => ({
+          ...formatMessage(message),
+          fromDisplayName: nameMap.get(message.fromUsername) || message.fromUsername,
+          toDisplayName: nameMap.get(message.toUsername) || message.toUsername
+        }))
+      );
+    } catch (error) {
+      console.error('Failed to load conversation history:', error.message);
+      socket.emit('conversation history', []);
+    }
+  });
+
   socket.on('typing', (data) => {
     const user = users.get(socket.id);
+    const toUsername = typeof data?.toUsername === 'string' ? data.toUsername.trim() : '';
 
-    if (user) {
-      socket.broadcast.emit('user typing', {
-        username: user.username,
-        isTyping: data.isTyping
+    if (user && toUsername) {
+      users.forEach((socketUser, socketId) => {
+        if (socketUser.username === toUsername && socketUser.activeContact === user.username) {
+          io.to(socketId).emit('user typing', {
+            username: user.username,
+            isTyping: Boolean(data.isTyping)
+          });
+        }
       });
     }
   });
@@ -583,13 +755,7 @@ io.on('connection', (socket) => {
     const user = users.get(socket.id);
 
     if (user) {
-      socket.broadcast.emit('user left', {
-        username: user.username,
-        message: `${user.username} left the chat`
-      });
       users.delete(socket.id);
-
-      io.emit('room users', Array.from(users.values()).map((roomUser) => roomUser.username));
     }
 
     console.log('User disconnected:', socket.id);
