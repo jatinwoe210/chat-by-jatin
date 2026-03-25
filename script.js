@@ -54,6 +54,10 @@ const typingIndicator = document.getElementById('typing-indicator');
 const userCount = document.getElementById('user-count');
 const activeMembers = document.getElementById('active-members');
 
+const stickerBtn = document.getElementById('sticker-btn');
+const categoryTabs = Array.from(document.querySelectorAll('.chat-tab'));
+const bottomNavItems = Array.from(document.querySelectorAll('.bottom-nav-item'));
+
 const eyeIconPath = 'M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z';
 const eyeSlashIconPath = 'M2.71 3.93 1.39 5.34l3.03 3.03A11.58 11.58 0 0 0 1 12c1.73 3.89 6 7 11 7 2.1 0 4.08-.55 5.78-1.5l3.83 3.83 1.41-1.41L2.71 3.93ZM7.53 11.48l1.57 1.57A3 3 0 0 1 9 12a3 3 0 0 1 .03-.52l-1.5-1.5a2.99 2.99 0 0 0 0 1.5ZM12 7c2.76 0 5 2.24 5 5 0 .81-.19 1.57-.53 2.24l1.46 1.46A6.9 6.9 0 0 0 19 12c0-3.87-3.13-7-7-7-.99 0-1.94.21-2.8.58l1.63 1.63c.37-.13.76-.21 1.17-.21Zm9 5c-.58-1.29-1.43-2.46-2.47-3.42l-1.43 1.43A9.95 9.95 0 0 1 18.89 12c-1.52 3.06-3.95 5-6.89 5-.89 0-1.73-.18-2.51-.5L7.9 14.91A4.98 4.98 0 0 0 12 17c5 0 9.27-3.11 11-7Z';
 
@@ -65,6 +69,27 @@ togglePasswordBtn.addEventListener('click', togglePasswordVisibility);
 toggleGooglePasswordBtn.addEventListener('click', toggleGooglePasswordVisibility);
 googlePasswordSubmitBtn.addEventListener('click', submitGooglePassword);
 profileSubmitBtn.addEventListener('click', submitGoogleProfile);
+
+if (stickerBtn) {
+    stickerBtn.addEventListener('click', () => {
+        messageInput.value = `${messageInput.value}😊`;
+        messageInput.focus();
+    });
+}
+
+categoryTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+        categoryTabs.forEach((item) => item.classList.remove('active'));
+        tab.classList.add('active');
+    });
+});
+
+bottomNavItems.forEach((item) => {
+    item.addEventListener('click', () => {
+        bottomNavItems.forEach((nav) => nav.classList.remove('active'));
+        item.classList.add('active');
+    });
+});
 
 [nameInput, usernameInput, passwordInput].forEach((input) => {
     input.addEventListener('keypress', (event) => {
