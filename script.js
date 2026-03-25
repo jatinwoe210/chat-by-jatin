@@ -33,6 +33,8 @@ const authMessage = document.getElementById('auth-message');
 const googleAuthBtn = document.getElementById('google-auth-btn');
 
 const googlePasswordInput = document.getElementById('google-password');
+const toggleGooglePasswordBtn = document.getElementById('toggle-google-password-btn');
+const googlePasswordEyeIcon = document.getElementById('google-password-eye-icon');
 const googlePasswordSubmitBtn = document.getElementById('google-password-submit-btn');
 const googlePasswordMessage = document.getElementById('google-password-message');
 
@@ -60,6 +62,7 @@ showSignupBtn.addEventListener('click', () => setAuthMode('signup'));
 authSubmitBtn.addEventListener('click', submitAuthForm);
 googleAuthBtn.addEventListener('click', beginGoogleSignIn);
 togglePasswordBtn.addEventListener('click', togglePasswordVisibility);
+toggleGooglePasswordBtn.addEventListener('click', toggleGooglePasswordVisibility);
 googlePasswordSubmitBtn.addEventListener('click', submitGooglePassword);
 profileSubmitBtn.addEventListener('click', submitGoogleProfile);
 
@@ -307,6 +310,16 @@ function togglePasswordVisibility() {
     togglePasswordBtn.setAttribute('aria-pressed', String(nextStateIsVisible));
     togglePasswordBtn.setAttribute('aria-label', nextStateIsVisible ? 'Hide password' : 'Show password');
     passwordEyeIcon.innerHTML = `<path d="${nextStateIsVisible ? eyeSlashIconPath : eyeIconPath}"></path>`;
+}
+
+function toggleGooglePasswordVisibility() {
+    const isVisible = googlePasswordInput.type === 'text';
+    const nextStateIsVisible = !isVisible;
+
+    googlePasswordInput.type = nextStateIsVisible ? 'text' : 'password';
+    toggleGooglePasswordBtn.setAttribute('aria-pressed', String(nextStateIsVisible));
+    toggleGooglePasswordBtn.setAttribute('aria-label', nextStateIsVisible ? 'Hide password' : 'Show password');
+    googlePasswordEyeIcon.innerHTML = `<path d="${nextStateIsVisible ? eyeSlashIconPath : eyeIconPath}"></path>`;
 }
 
 function enterChat() {
