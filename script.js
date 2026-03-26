@@ -4,10 +4,11 @@ import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstati
 const socket = io();
 
 let currentUser = '';
-let currentUserProfile = { username: '', displayName: '', email: '', bio: '' };
+let currentUserProfile = { uid: '', username: '', displayName: '', email: '', bio: '', photoURL: '' };
 let selectedContact = null;
 let contacts = [];
 let authMode = 'login';
+let isBioEditing = false;
 let firebaseAuth;
 let googleProvider;
 const pendingGoogleSession = {
@@ -60,10 +61,12 @@ const sidebarProfileBtn = document.getElementById('sidebar-profile-btn');
 const profileDrawer = document.getElementById('profile-drawer');
 const closeProfileDrawerBtn = document.getElementById('close-profile-drawer-btn');
 const drawerAvatar = document.getElementById('drawer-avatar');
-const drawerDisplayNameInput = document.getElementById('drawer-display-name');
+const drawerDisplayName = document.getElementById('drawer-display-name');
 const drawerContactInfo = document.getElementById('drawer-contact-info');
 const drawerBioInput = document.getElementById('drawer-bio');
-const editAvatarBtn = document.getElementById('edit-avatar-btn');
+const editBioBtn = document.getElementById('edit-bio-btn');
+const saveBioBtn = document.getElementById('save-bio-btn');
+const drawerBioMessage = document.getElementById('drawer-bio-message');
 const drawerLogoutBtn = document.getElementById('drawer-logout-btn');
 
 const stickerBtn = document.getElementById('sticker-btn');
@@ -140,26 +143,26 @@ if (profileDrawer) {
     });
 }
 
-if (drawerDisplayNameInput) {
-    drawerDisplayNameInput.addEventListener('input', () => {
-        const value = drawerDisplayNameInput.value.trim();
-        const displayName = value || currentUserProfile.displayName || currentUser || 'User';
-        currentUserProfile.displayName = displayName;
-        syncProfileHeader(displayName);
-    });
-}
-
 if (drawerBioInput) {
     drawerBioInput.addEventListener('input', () => {
         currentUserProfile.bio = drawerBioInput.value.trim();
     });
 }
 
-if (editAvatarBtn) {
-    editAvatarBtn.addEventListener('click', () => {
-        if (!drawerDisplayNameInput) return;
-        drawerDisplayNameInput.focus();
-        drawerDisplayNameInput.select();
+if (editBioBtn) {
+    editBioBtn.addEventListener('click', enableBioEdit);
+}
+
+if (saveBioBtn) {
+    saveBioBtn.addEventListener('click', saveBio);
+}
+
+if (drawerBioInput) {
+    drawerBioInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            saveBio();
+        }
     });
 }
 
@@ -225,6 +228,24 @@ async function postJson(endpoint, payload) {
     return result;
 }
 
+async function patchJson(endpoint, payload) {
+    const response = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Request failed.');
+    }
+
+    return result;
+}
+
 async function submitAuthForm() {
     const name = nameInput.value.trim();
     const username = usernameInput.value.trim();
@@ -267,10 +288,12 @@ async function submitAuthForm() {
 
         currentUser = username;
         currentUserProfile = {
+            uid: result.user?.uid || '',
             username,
             displayName: result.user?.displayName || result.user?.name || username,
             email: result.user?.email || '',
-            bio: result.user?.bio || ''
+            bio: result.user?.bio || '',
+            photoURL: result.user?.photoURL || ''
         };
         enterChat();
     } catch (error) {
@@ -311,10 +334,12 @@ async function beginGoogleSignIn() {
 
         currentUser = result.user.username;
         currentUserProfile = {
+            uid: result.user.uid || pendingGoogleSession.uid || '',
             username: result.user.username,
             displayName: result.user.displayName || result.user.name || result.user.username,
             email: result.user.email || pendingGoogleSession.email || '',
-            bio: result.user.bio || ''
+            bio: result.user.bio || '',
+            photoURL: result.user.photoURL || ''
         };
         enterChat();
     } catch (error) {
@@ -400,10 +425,12 @@ async function submitGoogleProfile() {
 
         currentUser = result.user.username;
         currentUserProfile = {
+            uid: result.user.uid || pendingGoogleSession.uid || '',
             username: result.user.username,
             displayName: result.user.displayName || result.user.username,
             email: result.user.email || pendingGoogleSession.email || '',
-            bio: result.user.bio || ''
+            bio: result.user.bio || '',
+            photoURL: result.user.photoURL || ''
         };
         enterChat();
     } catch (error) {
@@ -491,9 +518,23 @@ function syncProfileHeader(displayName) {
     const initial = resolvedDisplayName.charAt(0).toUpperCase();
     sidebarName.textContent = resolvedDisplayName;
     sidebarAvatar.textContent = initial;
+    sidebarAvatar.style.backgroundImage = '';
 
     if (drawerAvatar) {
-        drawerAvatar.textContent = initial;
+        const imageUrl = currentUserProfile.photoURL || '';
+        if (imageUrl) {
+            drawerAvatar.src = imageUrl;
+        } else {
+            drawerAvatar.removeAttribute('src');
+        }
+        drawerAvatar.alt = `${resolvedDisplayName} profile photo`;
+    }
+
+    if (currentUserProfile.photoURL) {
+        sidebarAvatar.textContent = '';
+        sidebarAvatar.style.backgroundImage = `url("${currentUserProfile.photoURL}")`;
+        sidebarAvatar.style.backgroundSize = 'cover';
+        sidebarAvatar.style.backgroundPosition = 'center';
     }
 }
 
@@ -502,8 +543,8 @@ function syncProfileDrawer() {
     const contactInfo = currentUserProfile.email || currentUser || '';
     const bio = currentUserProfile.bio || '';
 
-    if (drawerDisplayNameInput) {
-        drawerDisplayNameInput.value = displayName;
+    if (drawerDisplayName) {
+        drawerDisplayName.textContent = displayName;
     }
 
     if (drawerContactInfo) {
@@ -514,7 +555,69 @@ function syncProfileDrawer() {
         drawerBioInput.value = bio;
     }
 
+    setBioEditState(false);
+    showDrawerBioMessage('');
     syncProfileHeader(displayName);
+}
+
+function setBioEditState(enabled) {
+    isBioEditing = enabled;
+    if (!drawerBioInput || !saveBioBtn) return;
+
+    drawerBioInput.readOnly = !enabled;
+    saveBioBtn.classList.toggle('hidden', !enabled);
+
+    if (enabled) {
+        drawerBioInput.focus();
+        drawerBioInput.selectionStart = drawerBioInput.value.length;
+        drawerBioInput.selectionEnd = drawerBioInput.value.length;
+    }
+}
+
+function enableBioEdit() {
+    setBioEditState(true);
+}
+
+function showDrawerBioMessage(message, isError = false) {
+    if (!drawerBioMessage) return;
+    drawerBioMessage.textContent = message;
+    drawerBioMessage.className = `drawer-bio-message${isError ? ' error' : ''}`;
+}
+
+async function saveBio() {
+    if (!currentUserProfile.uid) {
+        showDrawerBioMessage('Only Google-authenticated users can save status.', true);
+        return;
+    }
+
+    const bio = drawerBioInput?.value.trim() || '';
+    if (bio.length > 140) {
+        showDrawerBioMessage('Status can be at most 140 characters.', true);
+        return;
+    }
+
+    if (saveBioBtn) {
+        saveBioBtn.disabled = true;
+        saveBioBtn.textContent = 'Saving...';
+    }
+    showDrawerBioMessage('');
+
+    try {
+        const result = await patchJson(`/api/users/${encodeURIComponent(currentUserProfile.uid)}`, { bio });
+        currentUserProfile.bio = result.user?.bio || bio;
+        if (drawerBioInput) {
+            drawerBioInput.value = currentUserProfile.bio;
+        }
+        setBioEditState(false);
+        showDrawerBioMessage('Status updated.');
+    } catch (error) {
+        showDrawerBioMessage(error.message || 'Unable to update status.', true);
+    } finally {
+        if (saveBioBtn) {
+            saveBioBtn.disabled = false;
+            saveBioBtn.textContent = 'Save status';
+        }
+    }
 }
 
 function sendMessage() {

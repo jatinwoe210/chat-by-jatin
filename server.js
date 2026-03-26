@@ -81,6 +81,12 @@ const Message = mongoose.model('Message', messageSchema);
 
 const userSchema = new mongoose.Schema(
   {
+    uid: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true
+    },
     name: {
       type: String,
       trim: true,
@@ -112,6 +118,16 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
       trim: true
+    },
+    photoURL: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    bio: {
+      type: String,
+      trim: true,
+      default: ''
     },
     authProviders: {
       type: [String],
@@ -338,10 +354,13 @@ app.post('/api/auth/login', async (req, res) => {
       success: true,
       message: 'Login successful.',
       user: {
+        uid: user.uid || '',
         name: user.name,
         username: user.username,
         displayName: user.displayName,
-        email: user.email
+        email: user.email,
+        bio: user.bio || '',
+        photoURL: user.photoURL || ''
       }
     });
   } catch (error) {
@@ -368,24 +387,31 @@ app.post('/api/auth/google', async (req, res) => {
     const googleUid = decodedToken.uid;
     const email = typeof decodedToken.email === 'string' ? decodedToken.email.toLowerCase() : '';
     const inferredName = decodedToken.name || '';
+    const photoURL = decodedToken.picture || '';
 
-    let user = await User.findOne({ $or: [{ googleUid }, ...(email ? [{ email }] : [])] });
+    let user = await User.findOne({ $or: [{ uid: googleUid }, { googleUid }, ...(email ? [{ email }] : [])] });
     let isNewUser = false;
 
     if (!user) {
       user = await User.create({
+        uid: googleUid,
         googleUid,
         email,
         name: inferredName,
         displayName: inferredName,
+        photoURL,
+        bio: '',
         authProviders: ['google']
       });
       isNewUser = true;
     } else {
+      user.uid = user.uid || googleUid;
       user.googleUid = user.googleUid || googleUid;
       user.email = user.email || email;
       user.name = user.name || inferredName;
       user.displayName = user.displayName || inferredName;
+      user.photoURL = user.photoURL || photoURL;
+      user.bio = typeof user.bio === 'string' ? user.bio : '';
       user.authProviders = upsertAuthProvider(user.authProviders, 'google');
       await user.save();
     }
@@ -397,11 +423,13 @@ app.post('/api/auth/google', async (req, res) => {
       requiresPassword: !user.password,
       requiresProfileSetup: !user.username || !user.displayName,
       user: {
-        uid: user.googleUid,
+        uid: user.uid || user.googleUid,
         email: user.email,
         username: user.username,
         name: user.name,
-        displayName: user.displayName
+        displayName: user.displayName,
+        photoURL: user.photoURL || '',
+        bio: user.bio || ''
       }
     });
   } catch (error) {
@@ -502,7 +530,9 @@ app.post('/api/auth/google/profile', async (req, res) => {
         username: user.username,
         displayName: user.displayName,
         email: user.email,
-        uid: user.googleUid
+        uid: user.uid || user.googleUid,
+        photoURL: user.photoURL || '',
+        bio: user.bio || ''
       }
     });
   } catch (error) {
@@ -510,6 +540,54 @@ app.post('/api/auth/google/profile', async (req, res) => {
     return res.status(401).json({
       success: false,
       message: 'Unable to save profile details.'
+    });
+  }
+});
+
+app.patch('/api/users/:uid', async (req, res) => {
+  const uid = typeof req.params.uid === 'string' ? req.params.uid.trim() : '';
+  const bio = typeof req.body?.bio === 'string' ? req.body.bio.trim() : '';
+
+  if (!uid) {
+    return res.status(400).json({
+      success: false,
+      message: 'User uid is required.'
+    });
+  }
+
+  if (bio.length > 140) {
+    return res.status(400).json({
+      success: false,
+      message: 'Bio must be 140 characters or fewer.'
+    });
+  }
+
+  try {
+    const user = await User.findOne({ $or: [{ uid }, { googleUid: uid }] });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.'
+      });
+    }
+
+    user.bio = bio;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Bio updated successfully.',
+      user: {
+        uid: user.uid || user.googleUid,
+        bio: user.bio || ''
+      }
+    });
+  } catch (error) {
+    console.error('Failed to update user bio:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to update bio right now.'
     });
   }
 });

@@ -141,30 +141,24 @@
                 <div id="profile-drawer" class="profile-drawer-overlay" hidden>
                     <div class="profile-drawer glass-panel" role="dialog" aria-modal="true" aria-labelledby="profile-drawer-title">
                         <div class="profile-drawer-header">
-                            <h3 id="profile-drawer-title">Profile Options</h3>
-                            <button id="close-profile-drawer-btn" class="icon-btn close-btn" type="button" aria-label="Close profile options">✕</button>
+                            <button id="close-profile-drawer-btn" class="icon-btn close-btn" type="button" aria-label="Back to chat list">←</button>
+                            <h3 id="profile-drawer-title">Profile</h3>
                         </div>
                         <div class="profile-drawer-content">
                             <div class="profile-hero">
-                                <div class="profile-avatar-large" id="drawer-avatar">Y</div>
-                                <button id="edit-avatar-btn" class="avatar-edit-btn" type="button" aria-label="Edit profile photo">✎</button>
-                            </div>
-
-                            <div class="drawer-info">
-                                <label class="drawer-input-wrap" for="drawer-display-name">Name</label>
-                                <input type="text" id="drawer-display-name" maxlength="30" placeholder="Your name">
+                                <img class="profile-avatar-large" id="drawer-avatar" src="" alt="Profile photo">
+                                <h4 id="drawer-display-name" class="drawer-display-name">User</h4>
                                 <p id="drawer-contact-info" class="drawer-contact-info">jatinwoe210@gmail.com</p>
                             </div>
 
                             <div class="drawer-info">
-                                <label class="drawer-input-wrap" for="drawer-bio">Bio / About</label>
-                                <textarea id="drawer-bio" rows="3" maxlength="140" placeholder="Write a short status"></textarea>
-                            </div>
-
-                            <div class="drawer-option-list">
-                                <button class="drawer-option" type="button"><span>⚙️</span>Account Settings</button>
-                                <button class="drawer-option" type="button"><span>🔒</span>Privacy</button>
-                                <button class="drawer-option" type="button"><span>🔔</span>Notifications</button>
+                                <div class="bio-row">
+                                    <label class="drawer-input-wrap" for="drawer-bio">Bio / Status</label>
+                                    <button id="edit-bio-btn" class="icon-btn bio-edit-btn" type="button" aria-label="Edit bio">✎</button>
+                                </div>
+                                <textarea id="drawer-bio" rows="3" maxlength="140" placeholder="Write a short status" readonly></textarea>
+                                <button id="save-bio-btn" class="drawer-save-btn hidden" type="button">Save status</button>
+                                <p id="drawer-bio-message" class="drawer-bio-message" aria-live="polite"></p>
                             </div>
                         </div>
                         <button id="drawer-logout-btn" class="drawer-option logout-option" type="button"><span>⏻</span>Logout</button>
