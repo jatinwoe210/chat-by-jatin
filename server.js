@@ -54,15 +54,17 @@ function normalizeMongoUri(uri) {
 const MONGODB_URI = normalizeMongoUri(RAW_MONGODB_URI);
 
 const messageSchema = new mongoose.Schema({
-  senderId: {
-    type: String,
+  sender: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: true,
-    trim: true
+    index: true
   },
-  receiverId: {
-    type: String,
+  receiver: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: true,
-    trim: true
+    index: true
   },
   text: {
     type: String,
@@ -76,7 +78,7 @@ const messageSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['sent', 'delivered'],
+    enum: ['sent', 'delivered', 'read'],
     default: 'sent'
   }
 });
@@ -104,8 +106,9 @@ const userSchema = new mongoose.Schema(
     username: {
       type: String,
       unique: true,
-      sparse: true,
-      trim: true
+      trim: true,
+      lowercase: true,
+      index: true
     },
     password: {
       type: String
@@ -128,10 +131,21 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: ''
     },
-    bio: {
+    googlePhotoURL: {
       type: String,
       trim: true,
       default: ''
+    },
+    customPhotoURL: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    bio: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 140
     },
     authProviders: {
       type: [String],
@@ -153,8 +167,16 @@ function formatMessage(messageDocument) {
   const timestampSource = messageDocument.timestamp || messageDocument.createdAt || new Date();
 
   return {
-    senderId: messageDocument.senderId,
-    receiverId: messageDocument.receiverId,
+    senderId:
+      messageDocument.sender?._id?.toString?.() ||
+      messageDocument.sender?.toString?.() ||
+      messageDocument.senderId ||
+      '',
+    receiverId:
+      messageDocument.receiver?._id?.toString?.() ||
+      messageDocument.receiver?.toString?.() ||
+      messageDocument.receiverId ||
+      '',
     text: messageDocument.text,
     status: messageDocument.status || 'sent',
     timestamp: new Date(timestampSource).toLocaleTimeString([], {
@@ -597,6 +619,114 @@ app.patch('/api/users/:uid', async (req, res) => {
   }
 });
 
+function generateDefaultUsername() {
+  return `user_${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+async function createUniqueDefaultUsername() {
+  let username = generateDefaultUsername();
+  let existing = await User.findOne({ username }).lean();
+
+  while (existing) {
+    username = generateDefaultUsername();
+    existing = await User.findOne({ username }).lean();
+  }
+
+  return username;
+}
+
+app.post('/api/users/sync', async (req, res) => {
+  const uid = typeof req.body?.uid === 'string' ? req.body.uid.trim() : '';
+  const googleUid = typeof req.body?.googleUid === 'string' ? req.body.googleUid.trim() : uid;
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const displayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : name;
+  const photoURL = typeof req.body?.photoURL === 'string' ? req.body.photoURL.trim() : '';
+  const customPhotoURL = typeof req.body?.customPhotoURL === 'string' ? req.body.customPhotoURL.trim() : '';
+  const bio = typeof req.body?.bio === 'string' ? req.body.bio.trim() : '';
+
+  if (!uid && !googleUid && !email) {
+    return res.status(400).json({
+      success: false,
+      message: 'At least one identifier (uid, googleUid, or email) is required.'
+    });
+  }
+
+  if (bio.length > 140) {
+    return res.status(400).json({
+      success: false,
+      message: 'Bio must be 140 characters or fewer.'
+    });
+  }
+
+  try {
+    const query = { $or: [] };
+    if (uid) query.$or.push({ uid });
+    if (googleUid) query.$or.push({ googleUid });
+    if (email) query.$or.push({ email });
+
+    let user = await User.findOne(query);
+    let isNewUser = false;
+
+    if (!user) {
+      const username = await createUniqueDefaultUsername();
+      user = await User.create({
+        uid: uid || googleUid || '',
+        googleUid: googleUid || uid || '',
+        email,
+        name,
+        displayName,
+        username,
+        photoURL,
+        googlePhotoURL: photoURL,
+        customPhotoURL,
+        bio,
+        authProviders: ['google']
+      });
+      isNewUser = true;
+    } else {
+      user.uid = user.uid || uid || googleUid;
+      user.googleUid = user.googleUid || googleUid || uid;
+      user.email = user.email || email;
+      user.name = user.name || name;
+      user.displayName = user.displayName || displayName || name;
+      user.photoURL = customPhotoURL || user.photoURL || photoURL;
+      user.googlePhotoURL = photoURL || user.googlePhotoURL || '';
+      user.customPhotoURL = customPhotoURL || user.customPhotoURL || '';
+      user.bio = bio || user.bio || '';
+      user.authProviders = upsertAuthProvider(user.authProviders, 'google');
+
+      if (!user.username) {
+        user.username = await createUniqueDefaultUsername();
+      }
+
+      await user.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      isNewUser,
+      user: {
+        id: user._id,
+        uid: user.uid || user.googleUid || '',
+        username: user.username,
+        name: user.name,
+        displayName: user.displayName,
+        email: user.email || '',
+        bio: user.bio || '',
+        googlePhotoURL: user.googlePhotoURL || '',
+        customPhotoURL: user.customPhotoURL || ''
+      }
+    });
+  } catch (error) {
+    console.error('Failed to sync user profile:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to sync user profile right now.'
+    });
+  }
+});
+
 app.get('/api/contacts', async (req, res) => {
   const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
 
@@ -714,9 +844,16 @@ app.post('/api/messages', async (req, res) => {
   }
 
   try {
+    if (!mongoose.Types.ObjectId.isValid(senderId) || !mongoose.Types.ObjectId.isValid(receiverId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'senderId and receiverId must be valid user ObjectIds.'
+      });
+    }
+
     const savedMessage = await Message.create({
-      senderId,
-      receiverId,
+      sender: senderId,
+      receiver: receiverId,
       text,
       status: 'sent'
     });
@@ -730,6 +867,49 @@ app.post('/api/messages', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Unable to save message right now.'
+    });
+  }
+});
+
+app.post('/api/messages/history', async (req, res) => {
+  const senderId = typeof req.body?.senderId === 'string' ? req.body.senderId.trim() : '';
+  const receiverId = typeof req.body?.receiverId === 'string' ? req.body.receiverId.trim() : '';
+
+  if (!senderId || !receiverId) {
+    return res.status(400).json({
+      success: false,
+      message: 'senderId and receiverId are required.'
+    });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(senderId) || !mongoose.Types.ObjectId.isValid(receiverId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'senderId and receiverId must be valid user ObjectIds.'
+    });
+  }
+
+  try {
+    const messages = await Message.find({
+      $or: [
+        { sender: senderId, receiver: receiverId },
+        { sender: receiverId, receiver: senderId }
+      ]
+    })
+      .sort({ timestamp: -1 })
+      .limit(50)
+      .sort({ timestamp: 1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      messages: messages.map((message) => formatMessage(message))
+    });
+  } catch (error) {
+    console.error('Failed to fetch message history:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to fetch message history right now.'
     });
   }
 });
