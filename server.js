@@ -53,29 +53,33 @@ function normalizeMongoUri(uri) {
 
 const MONGODB_URI = normalizeMongoUri(RAW_MONGODB_URI);
 
-const messageSchema = new mongoose.Schema(
-  {
-    fromUsername: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    toUsername: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    message: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 500
-    }
+const messageSchema = new mongoose.Schema({
+  senderId: {
+    type: String,
+    required: true,
+    trim: true
   },
-  {
-    timestamps: true
+  receiverId: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  text: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 500
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now
+  },
+  status: {
+    type: String,
+    enum: ['sent', 'delivered'],
+    default: 'sent'
   }
-);
+});
 
 const Message = mongoose.model('Message', messageSchema);
 
@@ -146,12 +150,13 @@ const userSchema = new mongoose.Schema(
 const User = mongoose.model('User', userSchema);
 
 function formatMessage(messageDocument) {
-  const timestampSource = messageDocument.createdAt || new Date();
+  const timestampSource = messageDocument.timestamp || messageDocument.createdAt || new Date();
 
   return {
-    fromUsername: messageDocument.fromUsername,
-    toUsername: messageDocument.toUsername,
-    message: messageDocument.message,
+    senderId: messageDocument.senderId,
+    receiverId: messageDocument.receiverId,
+    text: messageDocument.text,
+    status: messageDocument.status || 'sent',
     timestamp: new Date(timestampSource).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit'
@@ -696,6 +701,39 @@ app.post('/api/contacts/add', async (req, res) => {
   }
 });
 
+app.post('/api/messages', async (req, res) => {
+  const senderId = typeof req.body?.senderId === 'string' ? req.body.senderId.trim() : '';
+  const receiverId = typeof req.body?.receiverId === 'string' ? req.body.receiverId.trim() : '';
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+
+  if (!senderId || !receiverId || !text) {
+    return res.status(400).json({
+      success: false,
+      message: 'senderId, receiverId, and text are required.'
+    });
+  }
+
+  try {
+    const savedMessage = await Message.create({
+      senderId,
+      receiverId,
+      text,
+      status: 'sent'
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: formatMessage(savedMessage)
+    });
+  } catch (error) {
+    console.error('Failed to save message:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to save message right now.'
+    });
+  }
+});
+
 // Store users by socket id
 const users = new Map();
 
@@ -724,51 +762,36 @@ io.on('connection', (socket) => {
     users.set(socket.id, { username, activeContact: '' });
   });
 
-  socket.on('chat message', async (data) => {
+  socket.on('send-message', (data) => {
     const user = users.get(socket.id);
-    const toUsername = typeof data?.toUsername === 'string' ? data.toUsername.trim() : '';
-    const messageText = data.message?.trim();
+    const receiverId = typeof data?.receiverId === 'string' ? data.receiverId.trim() : '';
+    const text = typeof data?.text === 'string' ? data.text.trim() : '';
+    const timestamp = data?.timestamp || new Date();
+    const status = data?.status === 'delivered' ? 'delivered' : 'sent';
 
-    if (!user || !toUsername || !messageText) {
+    if (!user || !receiverId || !text) {
       return;
     }
 
-    try {
-      const savedMessage = await Message.create({
-        fromUsername: user.username,
-        toUsername,
-        message: messageText
-      });
+    const payload = formatMessage({
+      senderId: user.username,
+      receiverId,
+      text,
+      timestamp,
+      status
+    });
 
-      const participants = [user.username, toUsername];
-      const usersForNames = await User.find({ username: { $in: participants } })
-        .select('username displayName name')
-        .lean();
-      const nameMap = new Map(
-        usersForNames.map((item) => [item.username, item.displayName || item.name || item.username])
-      );
+    users.forEach((socketUser, socketId) => {
+      const isParticipant = socketUser.username === user.username || socketUser.username === receiverId;
+      if (!isParticipant) return;
 
-      const payload = {
-        ...formatMessage(savedMessage),
-        fromDisplayName: nameMap.get(user.username) || user.username,
-        toDisplayName: nameMap.get(toUsername) || toUsername
-      };
+      const isActiveConversation =
+        socketUser.activeContact === user.username || socketUser.activeContact === receiverId;
 
-      users.forEach((socketUser, socketId) => {
-        const isParticipant = socketUser.username === user.username || socketUser.username === toUsername;
-        if (!isParticipant) return;
-
-        const isActiveConversation =
-          socketUser.activeContact === user.username || socketUser.activeContact === toUsername;
-
-        if (isActiveConversation) {
-          io.to(socketId).emit('chat message', payload);
-        }
-      });
-    } catch (error) {
-      console.error(`Failed to save message for user "${user.username}":`, error.message);
-      socket.emit('message error', 'Unable to send message right now. Please try again.');
-    }
+      if (isActiveConversation) {
+        io.to(socketId).emit('receive-message', payload);
+      }
+    });
   });
 
   socket.on('open conversation', async (data) => {
@@ -784,28 +807,16 @@ io.on('connection', (socket) => {
     try {
       const history = await Message.find({
         $or: [
-          { fromUsername: user.username, toUsername: contactUsername },
-          { fromUsername: contactUsername, toUsername: user.username }
+          { senderId: user.username, receiverId: contactUsername },
+          { senderId: contactUsername, receiverId: user.username }
         ]
       })
-        .sort({ createdAt: 1 })
+        .sort({ timestamp: 1 })
         .lean();
-
-      const participantUsernames = [user.username, contactUsername];
-      const participantUsers = await User.find({ username: { $in: participantUsernames } })
-        .select('username displayName name')
-        .lean();
-      const nameMap = new Map(
-        participantUsers.map((item) => [item.username, item.displayName || item.name || item.username])
-      );
 
       socket.emit(
         'conversation history',
-        history.map((message) => ({
-          ...formatMessage(message),
-          fromDisplayName: nameMap.get(message.fromUsername) || message.fromUsername,
-          toDisplayName: nameMap.get(message.toUsername) || message.toUsername
-        }))
+        history.map((message) => formatMessage(message))
       );
     } catch (error) {
       console.error('Failed to load conversation history:', error.message);

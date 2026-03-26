@@ -51,9 +51,11 @@ const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 const messages = document.getElementById('messages');
 const usersList = document.getElementById('users-list');
-const sidebarAvatar = document.getElementById('sidebar-avatar');
-const sidebarName = document.getElementById('sidebar-name');
+const sidebarAvatar = document.getElementById('sidebar-avatar') || document.getElementById('user-pic');
+const sidebarName = document.getElementById('sidebar-name') || document.getElementById('user-name');
 const sidebarEmail = document.getElementById('sidebar-email');
+const userNameLabel = sidebarName;
+const userPic = sidebarAvatar;
 const typingIndicator = document.getElementById('typing-indicator');
 const chatTitle = document.getElementById('chat-title');
 const addUserBtn = document.getElementById('add-user-btn');
@@ -317,6 +319,14 @@ async function beginGoogleSignIn() {
         pendingGoogleSession.idToken = idToken;
         pendingGoogleSession.email = authResult.user.email || '';
         pendingGoogleSession.uid = authResult.user.uid;
+        currentUserProfile.displayName = authResult.user.displayName || currentUserProfile.displayName || '';
+        currentUserProfile.photoURL = authResult.user.photoURL || currentUserProfile.photoURL || '';
+        currentUserProfile.email = authResult.user.email || currentUserProfile.email || '';
+        syncProfileHeader(currentUserProfile.displayName);
+
+        if (sidebarEmail) {
+            sidebarEmail.textContent = currentUserProfile.email || sidebarEmail.textContent;
+        }
 
         const result = await postJson('/api/auth/google', { idToken });
 
@@ -516,9 +526,9 @@ let typingTimer;
 function syncProfileHeader(displayName) {
     const resolvedDisplayName = displayName || currentUser || 'User';
     const initial = resolvedDisplayName.charAt(0).toUpperCase();
-    sidebarName.textContent = resolvedDisplayName;
-    sidebarAvatar.textContent = initial;
-    sidebarAvatar.style.backgroundImage = '';
+    userNameLabel.textContent = resolvedDisplayName;
+    userPic.textContent = initial;
+    userPic.style.backgroundImage = '';
 
     if (drawerAvatar) {
         const imageUrl = currentUserProfile.photoURL || '';
@@ -531,10 +541,10 @@ function syncProfileHeader(displayName) {
     }
 
     if (currentUserProfile.photoURL) {
-        sidebarAvatar.textContent = '';
-        sidebarAvatar.style.backgroundImage = `url("${currentUserProfile.photoURL}")`;
-        sidebarAvatar.style.backgroundSize = 'cover';
-        sidebarAvatar.style.backgroundPosition = 'center';
+        userPic.textContent = '';
+        userPic.style.backgroundImage = `url("${currentUserProfile.photoURL}")`;
+        userPic.style.backgroundSize = 'cover';
+        userPic.style.backgroundPosition = 'center';
     }
 }
 
@@ -620,13 +630,26 @@ async function saveBio() {
     }
 }
 
-function sendMessage() {
-    const message = messageInput.value.trim();
-    if (!message || !selectedContact) return;
+async function sendMessage() {
+    const text = messageInput.value.trim();
+    if (!text || !selectedContact) return;
 
-    socket.emit('chat message', { message, toUsername: selectedContact.username });
-    messageInput.value = '';
-    stopTyping();
+    const payload = {
+        senderId: currentUser,
+        receiverId: selectedContact.username,
+        text,
+        timestamp: new Date().toISOString(),
+        status: 'sent'
+    };
+
+    try {
+        await postJson('/api/messages', payload);
+        socket.emit('send-message', payload);
+        messageInput.value = '';
+        stopTyping();
+    } catch (error) {
+        addSystemMessage(error.message || 'Unable to send message right now.');
+    }
 }
 
 messageInput.addEventListener('input', () => {
@@ -655,7 +678,7 @@ socket.on('conversation history', (history) => {
     });
 });
 
-socket.on('chat message', (data) => {
+socket.on('receive-message', (data) => {
     addMessage(data);
 });
 
@@ -674,11 +697,13 @@ socket.on('user typing', (data) => {
 
 function addMessage(data) {
     const messageDiv = document.createElement('div');
-    const isCurrentUser = data.fromUsername === currentUser;
-    const senderDisplayName = data.fromDisplayName || data.fromUsername;
+    const senderId = data.senderId || data.fromUsername || '';
+    const messageText = data.text || data.message || '';
+    const isCurrentUser = senderId === currentUser;
+    const senderDisplayName = isCurrentUser ? 'You' : (selectedContact?.displayName || senderId || 'User');
     const avatarInitial = senderDisplayName.charAt(0).toUpperCase();
 
-    messageDiv.className = `message${isCurrentUser ? ' own' : ''}`;
+    messageDiv.className = `message ${isCurrentUser ? 'sent' : 'received'}`;
     messageDiv.innerHTML = `
         <div class="message-avatar">${avatarInitial}</div>
         <div class="message-content">
@@ -686,7 +711,7 @@ function addMessage(data) {
                 <span class="message-username">${escapeHtml(senderDisplayName)}</span>
                 <span class="message-time">${escapeHtml(data.timestamp)}</span>
             </div>
-            <div class="message-text">${escapeHtml(data.message)}</div>
+            <div class="message-text">${escapeHtml(messageText)}</div>
         </div>
     `;
 
