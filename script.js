@@ -518,6 +518,7 @@ messageInput.addEventListener('keypress', (event) => {
 });
 
 let typingTimer;
+const renderedMessageMap = new Map();
 
 function syncProfileHeader(displayName) {
     const resolvedDisplayName = displayName || currentUser || 'User';
@@ -654,21 +655,31 @@ async function sendMessage() {
     if (!text || !selectedContact) return;
 
     const payload = {
-        senderId: currentUser,
-        receiverId: selectedContact.username,
+        senderUsername: currentUser,
+        receiverUsername: selectedContact.username,
         text,
+        clientMessageId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         timestamp: new Date().toISOString(),
         status: 'sent'
     };
 
     try {
-        await postJson('/api/messages', payload);
-        socket.emit('send-message', payload);
+        await saveMessageToDB(payload);
+        socket.emit('private message', payload);
         messageInput.value = '';
         stopTyping();
     } catch (error) {
         addSystemMessage(error.message || 'Unable to send message right now.');
     }
+}
+
+async function saveMessageToDB(msgData) {
+    return postJson('/api/messages', {
+        senderUsername: msgData.senderUsername,
+        receiverUsername: msgData.receiverUsername,
+        text: msgData.text,
+        clientMessageId: msgData.clientMessageId
+    });
 }
 
 messageInput.addEventListener('input', () => {
@@ -699,6 +710,22 @@ socket.on('conversation history', (history) => {
 
 socket.on('receive-message', (data) => {
     addMessage(data);
+
+    const senderUsername = data.senderUsername || data.senderId || '';
+    const shouldMarkAsRead =
+        senderUsername &&
+        senderUsername !== currentUser &&
+        selectedContact &&
+        selectedContact.username === senderUsername;
+
+    if (shouldMarkAsRead) {
+        socket.emit('message read', {
+            messageId: data.messageId || data._id || '',
+            clientMessageId: data.clientMessageId || '',
+            senderUsername,
+            receiverUsername: currentUser
+        });
+    }
 });
 
 socket.on('message error', (errorMessage) => {
@@ -716,11 +743,13 @@ socket.on('user typing', (data) => {
 
 function addMessage(data) {
     const messageDiv = document.createElement('div');
-    const senderId = data.senderId || data.fromUsername || '';
+    const senderId = data.senderUsername || data.senderId || data.fromUsername || '';
     const messageText = data.text || data.message || '';
     const isCurrentUser = senderId === currentUser;
     const senderDisplayName = isCurrentUser ? 'You' : (selectedContact?.displayName || senderId || 'User');
     const avatarInitial = senderDisplayName.charAt(0).toUpperCase();
+    const messageStatus = data.status || 'sent';
+    const messageRef = data.messageId || data._id || data.clientMessageId || '';
 
     messageDiv.className = `message ${isCurrentUser ? 'sent' : 'received'}`;
     messageDiv.innerHTML = `
@@ -731,12 +760,30 @@ function addMessage(data) {
                 <span class="message-time">${escapeHtml(data.timestamp)}</span>
             </div>
             <div class="message-text">${escapeHtml(messageText)}</div>
+            ${isCurrentUser ? `<div class="message-status" data-message-ref="${escapeHtml(messageRef)}">${messageStatus === 'read' ? '✓✓' : '✓'}</div>` : ''}
         </div>
     `;
+
+    if (isCurrentUser && messageRef) {
+        renderedMessageMap.set(messageRef, messageDiv);
+    }
 
     messages.appendChild(messageDiv);
     messages.scrollTop = messages.scrollHeight;
 }
+
+socket.on('message read update', (data) => {
+    const messageRef = data.messageId || data.clientMessageId || '';
+    if (!messageRef || !renderedMessageMap.has(messageRef)) {
+        return;
+    }
+
+    const messageElement = renderedMessageMap.get(messageRef);
+    const statusElement = messageElement?.querySelector('.message-status');
+    if (statusElement) {
+        statusElement.textContent = '✓✓';
+    }
+});
 
 function addSystemMessage(message) {
     const messageDiv = document.createElement('div');

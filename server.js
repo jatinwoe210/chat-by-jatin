@@ -72,6 +72,26 @@ const messageSchema = new mongoose.Schema({
     trim: true,
     maxlength: 500
   },
+  senderUsername: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    default: '',
+    index: true
+  },
+  receiverUsername: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    default: '',
+    index: true
+  },
+  clientMessageId: {
+    type: String,
+    trim: true,
+    default: '',
+    index: true
+  },
   timestamp: {
     type: Date,
     default: Date.now
@@ -167,6 +187,8 @@ function formatMessage(messageDocument) {
   const timestampSource = messageDocument.timestamp || messageDocument.createdAt || new Date();
 
   return {
+    messageId: messageDocument._id?.toString?.() || messageDocument.messageId || '',
+    clientMessageId: messageDocument.clientMessageId || '',
     senderId:
       messageDocument.sender?._id?.toString?.() ||
       messageDocument.sender?.toString?.() ||
@@ -177,6 +199,8 @@ function formatMessage(messageDocument) {
       messageDocument.receiver?.toString?.() ||
       messageDocument.receiverId ||
       '',
+    senderUsername: messageDocument.senderUsername || '',
+    receiverUsername: messageDocument.receiverUsername || '',
     text: messageDocument.text,
     status: messageDocument.status || 'sent',
     timestamp: new Date(timestampSource).toLocaleTimeString([], {
@@ -834,17 +858,51 @@ app.post('/api/contacts/add', async (req, res) => {
 app.post('/api/messages', async (req, res) => {
   const senderId = typeof req.body?.senderId === 'string' ? req.body.senderId.trim() : '';
   const receiverId = typeof req.body?.receiverId === 'string' ? req.body.receiverId.trim() : '';
+  const senderUsername = typeof req.body?.senderUsername === 'string' ? req.body.senderUsername.trim() : '';
+  const receiverUsername = typeof req.body?.receiverUsername === 'string' ? req.body.receiverUsername.trim() : '';
+  const clientMessageId = typeof req.body?.clientMessageId === 'string' ? req.body.clientMessageId.trim() : '';
   const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
 
-  if (!senderId || !receiverId || !text) {
+  if ((!senderId || !receiverId) && (!senderUsername || !receiverUsername)) {
     return res.status(400).json({
       success: false,
-      message: 'senderId, receiverId, and text are required.'
+      message: 'Either sender/receiver ids or usernames are required.'
+    });
+  }
+
+  if (!text) {
+    return res.status(400).json({
+      success: false,
+      message: 'Message text is required.'
     });
   }
 
   try {
-    if (!mongoose.Types.ObjectId.isValid(senderId) || !mongoose.Types.ObjectId.isValid(receiverId)) {
+    let resolvedSenderId = senderId;
+    let resolvedReceiverId = receiverId;
+    let resolvedSenderUsername = senderUsername;
+    let resolvedReceiverUsername = receiverUsername;
+
+    if (!resolvedSenderId || !resolvedReceiverId) {
+      const [senderUser, receiverUser] = await Promise.all([
+        User.findOne({ username: senderUsername }).select('_id username').lean(),
+        User.findOne({ username: receiverUsername }).select('_id username').lean()
+      ]);
+
+      if (!senderUser || !receiverUser) {
+        return res.status(404).json({
+          success: false,
+          message: 'Sender or receiver user not found.'
+        });
+      }
+
+      resolvedSenderId = senderUser._id.toString();
+      resolvedReceiverId = receiverUser._id.toString();
+      resolvedSenderUsername = senderUser.username;
+      resolvedReceiverUsername = receiverUser.username;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(resolvedSenderId) || !mongoose.Types.ObjectId.isValid(resolvedReceiverId)) {
       return res.status(400).json({
         success: false,
         message: 'senderId and receiverId must be valid user ObjectIds.'
@@ -852,8 +910,11 @@ app.post('/api/messages', async (req, res) => {
     }
 
     const savedMessage = await Message.create({
-      sender: senderId,
-      receiver: receiverId,
+      sender: resolvedSenderId,
+      receiver: resolvedReceiverId,
+      senderUsername: resolvedSenderUsername,
+      receiverUsername: resolvedReceiverUsername,
+      clientMessageId,
       text,
       status: 'sent'
     });
@@ -940,33 +1001,38 @@ io.on('connection', (socket) => {
     }
 
     users.set(socket.id, { username, activeContact: '' });
+    io.emit('online status', {
+      username,
+      isOnline: true
+    });
   });
 
-  socket.on('send-message', (data) => {
+  socket.on('private message', (data) => {
     const user = users.get(socket.id);
-    const receiverId = typeof data?.receiverId === 'string' ? data.receiverId.trim() : '';
+    const receiverUsername = typeof data?.receiverUsername === 'string' ? data.receiverUsername.trim() : '';
     const text = typeof data?.text === 'string' ? data.text.trim() : '';
     const timestamp = data?.timestamp || new Date();
+    const clientMessageId = typeof data?.clientMessageId === 'string' ? data.clientMessageId.trim() : '';
     const status = data?.status === 'delivered' ? 'delivered' : 'sent';
 
-    if (!user || !receiverId || !text) {
+    if (!user || !receiverUsername || !text) {
       return;
     }
 
-    const payload = formatMessage({
-      senderId: user.username,
-      receiverId,
+    const payload = {
+      senderUsername: user.username,
+      receiverUsername,
       text,
       timestamp,
-      status
-    });
+      status,
+      clientMessageId
+    };
 
     users.forEach((socketUser, socketId) => {
-      const isParticipant = socketUser.username === user.username || socketUser.username === receiverId;
+      const isParticipant = socketUser.username === user.username || socketUser.username === receiverUsername;
       if (!isParticipant) return;
 
-      const isActiveConversation =
-        socketUser.activeContact === user.username || socketUser.activeContact === receiverId;
+      const isActiveConversation = socketUser.activeContact === user.username || socketUser.activeContact === receiverUsername;
 
       if (isActiveConversation) {
         io.to(socketId).emit('receive-message', payload);
@@ -985,10 +1051,20 @@ io.on('connection', (socket) => {
     users.set(socket.id, { ...user, activeContact: contactUsername });
 
     try {
+      const [currentUserRecord, contactUserRecord] = await Promise.all([
+        User.findOne({ username: user.username }).select('_id').lean(),
+        User.findOne({ username: contactUsername }).select('_id').lean()
+      ]);
+
+      if (!currentUserRecord || !contactUserRecord) {
+        socket.emit('conversation history', []);
+        return;
+      }
+
       const history = await Message.find({
         $or: [
-          { senderId: user.username, receiverId: contactUsername },
-          { senderId: contactUsername, receiverId: user.username }
+          { sender: currentUserRecord._id, receiver: contactUserRecord._id },
+          { sender: contactUserRecord._id, receiver: currentUserRecord._id }
         ]
       })
         .sort({ timestamp: 1 })
@@ -1011,19 +1087,55 @@ io.on('connection', (socket) => {
     if (user && toUsername) {
       users.forEach((socketUser, socketId) => {
         if (socketUser.username === toUsername && socketUser.activeContact === user.username) {
-          io.to(socketId).emit('user typing', {
+          const typingPayload = {
             username: user.username,
             isTyping: Boolean(data.isTyping)
-          });
+          };
+          io.to(socketId).emit('user typing', typingPayload);
+          io.to(socketId).emit('typing status', typingPayload);
         }
       });
     }
+  });
+
+  socket.on('message read', async (data) => {
+    const reader = users.get(socket.id);
+    const senderUsername = typeof data?.senderUsername === 'string' ? data.senderUsername.trim() : '';
+    const messageId = typeof data?.messageId === 'string' ? data.messageId.trim() : '';
+    const clientMessageId = typeof data?.clientMessageId === 'string' ? data.clientMessageId.trim() : '';
+
+    if (!reader || !senderUsername) {
+      return;
+    }
+
+    if (messageId && mongoose.Types.ObjectId.isValid(messageId)) {
+      await Message.findByIdAndUpdate(messageId, { status: 'read' }).catch(() => null);
+    } else if (clientMessageId) {
+      await Message.findOneAndUpdate(
+        { clientMessageId, senderUsername, receiverUsername: reader.username },
+        { status: 'read' }
+      ).catch(() => null);
+    }
+
+    users.forEach((socketUser, socketId) => {
+      if (socketUser.username === senderUsername) {
+        io.to(socketId).emit('message read update', {
+          messageId,
+          clientMessageId,
+          readBy: reader.username
+        });
+      }
+    });
   });
 
   socket.on('disconnect', () => {
     const user = users.get(socket.id);
 
     if (user) {
+      io.emit('online status', {
+        username: user.username,
+        isOnline: false
+      });
       users.delete(socket.id);
     }
 
