@@ -144,7 +144,30 @@
                             <h3 id="profile-drawer-title">Profile Options</h3>
                             <button id="close-profile-drawer-btn" class="icon-btn close-btn" type="button" aria-label="Close profile options">✕</button>
                         </div>
-                        <button id="drawer-logout-btn" class="drawer-option logout-option" type="button">Logout</button>
+                        <div class="profile-drawer-content">
+                            <div class="profile-hero">
+                                <div class="profile-avatar-large" id="drawer-avatar">Y</div>
+                                <button id="edit-avatar-btn" class="avatar-edit-btn" type="button" aria-label="Edit profile photo">✎</button>
+                            </div>
+
+                            <div class="drawer-info">
+                                <label class="drawer-input-wrap" for="drawer-display-name">Name</label>
+                                <input type="text" id="drawer-display-name" maxlength="30" placeholder="Your name">
+                                <p id="drawer-contact-info" class="drawer-contact-info">jatinwoe210@gmail.com</p>
+                            </div>
+
+                            <div class="drawer-info">
+                                <label class="drawer-input-wrap" for="drawer-bio">Bio / About</label>
+                                <textarea id="drawer-bio" rows="3" maxlength="140" placeholder="Write a short status"></textarea>
+                            </div>
+
+                            <div class="drawer-option-list">
+                                <button class="drawer-option" type="button"><span>⚙️</span>Account Settings</button>
+                                <button class="drawer-option" type="button"><span>🔒</span>Privacy</button>
+                                <button class="drawer-option" type="button"><span>🔔</span>Notifications</button>
+                            </div>
+                        </div>
+                        <button id="drawer-logout-btn" class="drawer-option logout-option" type="button"><span>⏻</span>Logout</button>
                     </div>
                 </div>
             </div>

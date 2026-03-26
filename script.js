@@ -4,7 +4,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstati
 const socket = io();
 
 let currentUser = '';
-let currentUserProfile = { username: '', displayName: '', email: '' };
+let currentUserProfile = { username: '', displayName: '', email: '', bio: '' };
 let selectedContact = null;
 let contacts = [];
 let authMode = 'login';
@@ -59,6 +59,11 @@ const addUserBtn = document.getElementById('add-user-btn');
 const sidebarProfileBtn = document.getElementById('sidebar-profile-btn');
 const profileDrawer = document.getElementById('profile-drawer');
 const closeProfileDrawerBtn = document.getElementById('close-profile-drawer-btn');
+const drawerAvatar = document.getElementById('drawer-avatar');
+const drawerDisplayNameInput = document.getElementById('drawer-display-name');
+const drawerContactInfo = document.getElementById('drawer-contact-info');
+const drawerBioInput = document.getElementById('drawer-bio');
+const editAvatarBtn = document.getElementById('edit-avatar-btn');
 const drawerLogoutBtn = document.getElementById('drawer-logout-btn');
 
 const stickerBtn = document.getElementById('sticker-btn');
@@ -108,6 +113,7 @@ if (profileDrawer) {
 
 function openProfileDrawer() {
     if (!profileDrawer) return;
+    syncProfileDrawer();
     profileDrawer.hidden = false;
     profileDrawer.classList.add('active');
 }
@@ -131,6 +137,29 @@ if (profileDrawer) {
         if (event.target === profileDrawer) {
             closeProfileDrawer();
         }
+    });
+}
+
+if (drawerDisplayNameInput) {
+    drawerDisplayNameInput.addEventListener('input', () => {
+        const value = drawerDisplayNameInput.value.trim();
+        const displayName = value || currentUserProfile.displayName || currentUser || 'User';
+        currentUserProfile.displayName = displayName;
+        syncProfileHeader(displayName);
+    });
+}
+
+if (drawerBioInput) {
+    drawerBioInput.addEventListener('input', () => {
+        currentUserProfile.bio = drawerBioInput.value.trim();
+    });
+}
+
+if (editAvatarBtn) {
+    editAvatarBtn.addEventListener('click', () => {
+        if (!drawerDisplayNameInput) return;
+        drawerDisplayNameInput.focus();
+        drawerDisplayNameInput.select();
     });
 }
 
@@ -240,7 +269,8 @@ async function submitAuthForm() {
         currentUserProfile = {
             username,
             displayName: result.user?.displayName || result.user?.name || username,
-            email: result.user?.email || ''
+            email: result.user?.email || '',
+            bio: result.user?.bio || ''
         };
         enterChat();
     } catch (error) {
@@ -283,7 +313,8 @@ async function beginGoogleSignIn() {
         currentUserProfile = {
             username: result.user.username,
             displayName: result.user.displayName || result.user.name || result.user.username,
-            email: result.user.email || pendingGoogleSession.email || ''
+            email: result.user.email || pendingGoogleSession.email || '',
+            bio: result.user.bio || ''
         };
         enterChat();
     } catch (error) {
@@ -371,7 +402,8 @@ async function submitGoogleProfile() {
         currentUserProfile = {
             username: result.user.username,
             displayName: result.user.displayName || result.user.username,
-            email: result.user.email || pendingGoogleSession.email || ''
+            email: result.user.email || pendingGoogleSession.email || '',
+            bio: result.user.bio || ''
         };
         enterChat();
     } catch (error) {
@@ -425,9 +457,9 @@ function enterChat() {
 
     showScreen('chat');
     const resolvedDisplayName = currentUserProfile.displayName || currentUser;
-    sidebarName.textContent = resolvedDisplayName;
     sidebarEmail.textContent = currentUserProfile.email || currentUser;
-    sidebarAvatar.textContent = resolvedDisplayName.charAt(0).toUpperCase();
+    syncProfileDrawer();
+    syncProfileHeader(resolvedDisplayName);
     chatTitle.textContent = 'My Contacts';
     closeProfileDrawer();
     window.location.hash = 'chat';
@@ -453,6 +485,37 @@ messageInput.addEventListener('keypress', (event) => {
 });
 
 let typingTimer;
+
+function syncProfileHeader(displayName) {
+    const resolvedDisplayName = displayName || currentUser || 'User';
+    const initial = resolvedDisplayName.charAt(0).toUpperCase();
+    sidebarName.textContent = resolvedDisplayName;
+    sidebarAvatar.textContent = initial;
+
+    if (drawerAvatar) {
+        drawerAvatar.textContent = initial;
+    }
+}
+
+function syncProfileDrawer() {
+    const displayName = currentUserProfile.displayName || currentUser || 'User';
+    const contactInfo = currentUserProfile.email || currentUser || '';
+    const bio = currentUserProfile.bio || '';
+
+    if (drawerDisplayNameInput) {
+        drawerDisplayNameInput.value = displayName;
+    }
+
+    if (drawerContactInfo) {
+        drawerContactInfo.textContent = contactInfo;
+    }
+
+    if (drawerBioInput) {
+        drawerBioInput.value = bio;
+    }
+
+    syncProfileHeader(displayName);
+}
 
 function sendMessage() {
     const message = messageInput.value.trim();
