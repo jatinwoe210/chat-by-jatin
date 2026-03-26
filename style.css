@@ -509,24 +509,24 @@ textarea {
     inset: 0;
     background: rgba(5, 9, 18, 0.68);
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
     z-index: 40;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.25s ease;
 }
 
 .profile-drawer {
-    width: min(360px, 92vw);
+    width: min(350px, 100vw);
     height: 100%;
     border-radius: 0;
-    border-left: 1px solid rgba(255, 255, 255, 0.18);
+    border-right: 1px solid rgba(255, 255, 255, 0.18);
     padding: 18px 16px 16px;
     display: flex;
     flex-direction: column;
     gap: 14px;
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
+    transform: translateX(-100%);
+    transition: transform 0.32s ease;
 }
 
 .profile-drawer-overlay.active {
@@ -558,42 +558,25 @@ textarea {
     margin-top: 4px;
     display: flex;
     justify-content: center;
-    position: relative;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .profile-avatar-large {
-    width: 108px;
-    height: 108px;
+    width: 124px;
+    height: 124px;
     border-radius: 50%;
+    object-fit: cover;
     background: linear-gradient(140deg, #79a8ff, #4d87d8);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 2.35rem;
-    letter-spacing: 1px;
     border: 2px solid rgba(255, 255, 255, 0.26);
     box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
 }
 
-.avatar-edit-btn {
-    position: absolute;
-    right: calc(50% - 56px);
-    bottom: 4px;
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.24);
-    background: rgba(15, 26, 46, 0.96);
-    color: #d7e8ff;
-    cursor: pointer;
-    transition: transform 0.2s ease, background 0.2s ease;
-}
-
-.avatar-edit-btn:hover {
-    transform: translateY(-1px);
-    background: rgba(107, 168, 255, 0.28);
+.drawer-display-name {
+    font-size: 1.15rem;
+    font-weight: 700;
+    text-align: center;
 }
 
 .drawer-info {
@@ -608,7 +591,6 @@ textarea {
     letter-spacing: 0.08em;
 }
 
-#drawer-display-name,
 #drawer-bio {
     border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: 12px;
@@ -623,7 +605,6 @@ textarea {
     min-height: 78px;
 }
 
-#drawer-display-name:focus,
 #drawer-bio:focus {
     outline: none;
     border-color: rgba(106, 157, 255, 0.9);
@@ -639,6 +620,41 @@ textarea {
 .drawer-option-list {
     display: grid;
     gap: 8px;
+}
+
+.bio-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.bio-edit-btn {
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: #d9e8ff;
+}
+
+.drawer-save-btn {
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: white;
+    font-weight: 600;
+    padding: 10px 14px;
+    cursor: pointer;
+}
+
+.drawer-bio-message {
+    min-height: 18px;
+    font-size: 0.8rem;
+    color: #7be2a8;
+}
+
+.drawer-bio-message.error {
+    color: #ff9f9f;
 }
 
 .close-btn {
@@ -684,6 +700,7 @@ textarea {
 @media (max-width: 960px) {
     .app-shell { padding: 0; }
     .chat-container { width: 100%; height: 100%; border-radius: 0; }
+    .profile-drawer { width: 100vw; }
 }
 
 @media (max-width: 460px) {
