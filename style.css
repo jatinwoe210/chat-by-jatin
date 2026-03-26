@@ -518,7 +518,7 @@ textarea {
 }
 
 .profile-drawer {
-    width: min(350px, 100vw);
+    width: 100%;
     height: 100%;
     border-radius: 0;
     border-right: 1px solid rgba(255, 255, 255, 0.18);
@@ -527,13 +527,13 @@ textarea {
     flex-direction: column;
     gap: 14px;
     transform: translateX(-100%);
-    transition: transform 0.32s ease;
+    transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .profile-options {
     height: 100vh;
     transform: translateX(-100%);
-    transition: transform 0.32s ease;
+    transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .profile-drawer-overlay.active {
@@ -580,10 +580,35 @@ textarea {
     box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
 }
 
+.drawer-avatar-wrap {
+    position: relative;
+}
+
+.drawer-avatar-edit-btn {
+    position: absolute;
+    right: 4px;
+    bottom: 6px;
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    background: rgba(8, 20, 41, 0.88);
+    color: #dce9ff;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
 .drawer-display-name {
     font-size: 1.15rem;
     font-weight: 700;
     text-align: center;
+}
+
+.drawer-username {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
 }
 
 .drawer-info {
@@ -627,21 +652,6 @@ textarea {
 .drawer-option-list {
     display: grid;
     gap: 8px;
-}
-
-.bio-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.bio-edit-btn {
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.08);
-    color: #d9e8ff;
 }
 
 .drawer-save-btn {
@@ -707,7 +717,11 @@ textarea {
 @media (max-width: 960px) {
     .app-shell { padding: 0; }
     .chat-container { width: 100%; height: 100%; border-radius: 0; }
-    .profile-drawer { width: 100vw; }
+    .profile-drawer { width: 100%; }
+}
+
+@media (min-width: 961px) {
+    .profile-drawer { width: 350px; }
 }
 
 @media (max-width: 460px) {
