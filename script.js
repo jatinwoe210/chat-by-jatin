@@ -1,5 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-storage.js';
 
 const socket = io();
 
@@ -8,9 +9,9 @@ let currentUserProfile = { uid: '', username: '', displayName: '', email: '', bi
 let selectedContact = null;
 let contacts = [];
 let authMode = 'login';
-let isBioEditing = false;
 let firebaseAuth;
 let googleProvider;
+let firebaseStorage;
 const pendingGoogleSession = {
     idToken: '',
     email: '',
@@ -63,10 +64,12 @@ const sidebarProfileBtn = document.getElementById('sidebar-profile-btn');
 const profileDrawer = document.getElementById('profile-drawer');
 const closeProfileDrawerBtn = document.getElementById('close-profile-drawer-btn');
 const drawerAvatar = document.getElementById('drawer-avatar');
+const drawerAvatarEditBtn = document.getElementById('drawer-avatar-edit-btn');
+const drawerAvatarInput = document.getElementById('drawer-avatar-input');
 const drawerDisplayName = document.getElementById('drawer-display-name');
+const drawerUsername = document.getElementById('drawer-username');
 const drawerContactInfo = document.getElementById('drawer-contact-info');
 const drawerBioInput = document.getElementById('drawer-bio');
-const editBioBtn = document.getElementById('edit-bio-btn');
 const saveBioBtn = document.getElementById('save-bio-btn');
 const drawerBioMessage = document.getElementById('drawer-bio-message');
 const drawerLogoutBtn = document.getElementById('drawer-logout-btn');
@@ -151,21 +154,13 @@ if (drawerBioInput) {
     });
 }
 
-if (editBioBtn) {
-    editBioBtn.addEventListener('click', enableBioEdit);
-}
-
 if (saveBioBtn) {
     saveBioBtn.addEventListener('click', saveBio);
 }
 
-if (drawerBioInput) {
-    drawerBioInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            saveBio();
-        }
-    });
+if (drawerAvatarEditBtn && drawerAvatarInput) {
+    drawerAvatarEditBtn.addEventListener('click', () => drawerAvatarInput.click());
+    drawerAvatarInput.addEventListener('change', uploadProfilePhoto);
 }
 
 document.addEventListener('click', (event) => {
@@ -361,7 +356,7 @@ async function beginGoogleSignIn() {
 }
 
 async function ensureFirebaseReady() {
-    if (firebaseAuth && googleProvider) {
+    if (firebaseAuth && googleProvider && firebaseStorage) {
         return;
     }
 
@@ -375,6 +370,7 @@ async function ensureFirebaseReady() {
     const app = initializeApp(result.config);
     firebaseAuth = getAuth(app);
     googleProvider = new GoogleAuthProvider();
+    firebaseStorage = getStorage(app);
 }
 
 async function submitGooglePassword() {
@@ -550,6 +546,7 @@ function syncProfileHeader(displayName) {
 
 function syncProfileDrawer() {
     const displayName = currentUserProfile.displayName || currentUser || 'User';
+    const username = currentUserProfile.username || currentUser || 'user';
     const contactInfo = currentUserProfile.email || currentUser || '';
     const bio = currentUserProfile.bio || '';
 
@@ -561,31 +558,16 @@ function syncProfileDrawer() {
         drawerContactInfo.textContent = contactInfo;
     }
 
+    if (drawerUsername) {
+        drawerUsername.textContent = `@${username}`;
+    }
+
     if (drawerBioInput) {
         drawerBioInput.value = bio;
     }
 
-    setBioEditState(false);
     showDrawerBioMessage('');
     syncProfileHeader(displayName);
-}
-
-function setBioEditState(enabled) {
-    isBioEditing = enabled;
-    if (!drawerBioInput || !saveBioBtn) return;
-
-    drawerBioInput.readOnly = !enabled;
-    saveBioBtn.classList.toggle('hidden', !enabled);
-
-    if (enabled) {
-        drawerBioInput.focus();
-        drawerBioInput.selectionStart = drawerBioInput.value.length;
-        drawerBioInput.selectionEnd = drawerBioInput.value.length;
-    }
-}
-
-function enableBioEdit() {
-    setBioEditState(true);
 }
 
 function showDrawerBioMessage(message, isError = false) {
@@ -595,11 +577,6 @@ function showDrawerBioMessage(message, isError = false) {
 }
 
 async function saveBio() {
-    if (!currentUserProfile.uid) {
-        showDrawerBioMessage('Only Google-authenticated users can save status.', true);
-        return;
-    }
-
     const bio = drawerBioInput?.value.trim() || '';
     if (bio.length > 140) {
         showDrawerBioMessage('Status can be at most 140 characters.', true);
@@ -613,12 +590,15 @@ async function saveBio() {
     showDrawerBioMessage('');
 
     try {
-        const result = await patchJson(`/api/users/${encodeURIComponent(currentUserProfile.uid)}`, { bio });
+        const result = await patchJson('/api/users/update-bio', {
+            uid: currentUserProfile.uid || '',
+            username: currentUserProfile.username || currentUser || '',
+            bio
+        });
         currentUserProfile.bio = result.user?.bio || bio;
         if (drawerBioInput) {
             drawerBioInput.value = currentUserProfile.bio;
         }
-        setBioEditState(false);
         showDrawerBioMessage('Status updated.');
     } catch (error) {
         showDrawerBioMessage(error.message || 'Unable to update status.', true);
@@ -627,6 +607,45 @@ async function saveBio() {
             saveBioBtn.disabled = false;
             saveBioBtn.textContent = 'Save status';
         }
+    }
+}
+
+async function uploadProfilePhoto(event) {
+    const selectedFile = event.target?.files?.[0];
+    if (!selectedFile) {
+        return;
+    }
+
+    if (!selectedFile.type.startsWith('image/')) {
+        showDrawerBioMessage('Please select a valid image file.', true);
+        return;
+    }
+
+    try {
+        await ensureFirebaseReady();
+        showDrawerBioMessage('Uploading profile photo...');
+        drawerAvatarEditBtn.disabled = true;
+
+        const ownerId = currentUserProfile.uid || currentUserProfile.username || currentUser || 'user';
+        const extension = selectedFile.name.split('.').pop() || 'jpg';
+        const storageRef = ref(firebaseStorage, `profile-photos/${ownerId}-${Date.now()}.${extension}`);
+        await uploadBytes(storageRef, selectedFile);
+        const photoURL = await getDownloadURL(storageRef);
+
+        const result = await patchJson('/api/users/update-photo', {
+            uid: currentUserProfile.uid || '',
+            username: currentUserProfile.username || currentUser || '',
+            photoURL
+        });
+
+        currentUserProfile.photoURL = result.user?.photoURL || photoURL;
+        syncProfileHeader(currentUserProfile.displayName || currentUser);
+        showDrawerBioMessage('Profile photo updated.');
+    } catch (error) {
+        showDrawerBioMessage(error.message || 'Unable to update profile photo.', true);
+    } finally {
+        drawerAvatarEditBtn.disabled = false;
+        drawerAvatarInput.value = '';
     }
 }
 
