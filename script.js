@@ -1,6 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-storage.js';
 
 const socket = io();
 
@@ -11,7 +10,6 @@ let contacts = [];
 let authMode = 'login';
 let firebaseAuth;
 let googleProvider;
-let firebaseStorage;
 const pendingGoogleSession = {
     idToken: '',
     email: '',
@@ -65,7 +63,7 @@ const profileDrawer = document.getElementById('profile-drawer');
 const closeProfileDrawerBtn = document.getElementById('close-profile-drawer-btn');
 const drawerAvatar = document.getElementById('drawer-avatar');
 const drawerAvatarEditBtn = document.getElementById('drawer-avatar-edit-btn');
-const drawerAvatarInput = document.getElementById('drawer-avatar-input');
+const avatarUploadInput = document.getElementById('avatar-upload');
 const drawerDisplayName = document.getElementById('drawer-display-name');
 const drawerUsername = document.getElementById('drawer-username');
 const drawerContactInfo = document.getElementById('drawer-contact-info');
@@ -158,9 +156,9 @@ if (saveBioBtn) {
     saveBioBtn.addEventListener('click', saveBio);
 }
 
-if (drawerAvatarEditBtn && drawerAvatarInput) {
-    drawerAvatarEditBtn.addEventListener('click', () => drawerAvatarInput.click());
-    drawerAvatarInput.addEventListener('change', uploadProfilePhoto);
+if (drawerAvatarEditBtn && avatarUploadInput) {
+    drawerAvatarEditBtn.addEventListener('click', () => avatarUploadInput.click());
+    avatarUploadInput.addEventListener('change', uploadProfilePhoto);
 }
 
 document.addEventListener('click', (event) => {
@@ -283,10 +281,10 @@ async function submitAuthForm() {
             return;
         }
 
-        currentUser = username;
+        currentUser = result.user?.username || username;
         currentUserProfile = {
             uid: result.user?.uid || '',
-            username,
+            username: result.user?.username || username,
             displayName: result.user?.displayName || result.user?.name || username,
             email: result.user?.email || '',
             bio: result.user?.bio || '',
@@ -356,7 +354,7 @@ async function beginGoogleSignIn() {
 }
 
 async function ensureFirebaseReady() {
-    if (firebaseAuth && googleProvider && firebaseStorage) {
+    if (firebaseAuth && googleProvider) {
         return;
     }
 
@@ -370,7 +368,6 @@ async function ensureFirebaseReady() {
     const app = initializeApp(result.config);
     firebaseAuth = getAuth(app);
     googleProvider = new GoogleAuthProvider();
-    firebaseStorage = getStorage(app);
 }
 
 async function submitGooglePassword() {
@@ -490,7 +487,7 @@ function enterChat() {
 
     showScreen('chat');
     const resolvedDisplayName = currentUserProfile.displayName || currentUser;
-    sidebarEmail.textContent = currentUserProfile.email || currentUser;
+    sidebarEmail.textContent = `@${currentUserProfile.username || currentUser}`;
     syncProfileDrawer();
     syncProfileHeader(resolvedDisplayName);
     chatTitle.textContent = 'My Contacts';
@@ -548,7 +545,7 @@ function syncProfileHeader(displayName) {
 function syncProfileDrawer() {
     const displayName = currentUserProfile.displayName || currentUser || 'User';
     const username = currentUserProfile.username || currentUser || 'user';
-    const contactInfo = currentUserProfile.email || currentUser || '';
+    const contactInfo = `@${username}`;
     const bio = currentUserProfile.bio || '';
 
     if (drawerDisplayName) {
@@ -600,6 +597,7 @@ async function saveBio() {
         if (drawerBioInput) {
             drawerBioInput.value = currentUserProfile.bio;
         }
+        syncProfileDrawer();
         showDrawerBioMessage('Status updated.');
     } catch (error) {
         showDrawerBioMessage(error.message || 'Unable to update status.', true);
@@ -623,30 +621,31 @@ async function uploadProfilePhoto(event) {
     }
 
     try {
-        await ensureFirebaseReady();
         showDrawerBioMessage('Uploading profile photo...');
         drawerAvatarEditBtn.disabled = true;
+        const payload = new FormData();
+        payload.append('avatar', selectedFile);
+        payload.append('uid', currentUserProfile.uid || '');
+        payload.append('username', currentUserProfile.username || currentUser || '');
 
-        const ownerId = currentUserProfile.uid || currentUserProfile.username || currentUser || 'user';
-        const extension = selectedFile.name.split('.').pop() || 'jpg';
-        const storageRef = ref(firebaseStorage, `profile-photos/${ownerId}-${Date.now()}.${extension}`);
-        await uploadBytes(storageRef, selectedFile);
-        const photoURL = await getDownloadURL(storageRef);
-
-        const result = await patchJson('/api/users/update-photo', {
-            uid: currentUserProfile.uid || '',
-            username: currentUserProfile.username || currentUser || '',
-            photoURL
+        const response = await fetch('/api/users/upload-avatar', {
+            method: 'POST',
+            body: payload
         });
+        const result = await response.json();
 
-        currentUserProfile.photoURL = result.user?.photoURL || photoURL;
-        syncProfileHeader(currentUserProfile.displayName || currentUser);
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || 'Unable to upload profile photo.');
+        }
+
+        currentUserProfile.photoURL = result.user?.photoURL || '';
+        syncProfileDrawer();
         showDrawerBioMessage('Profile photo updated.');
     } catch (error) {
         showDrawerBioMessage(error.message || 'Unable to update profile photo.', true);
     } finally {
         drawerAvatarEditBtn.disabled = false;
-        drawerAvatarInput.value = '';
+        avatarUploadInput.value = '';
     }
 }
 

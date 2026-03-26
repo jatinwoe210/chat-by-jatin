@@ -5,6 +5,8 @@ const http = require('http');
 const mongoose = require('mongoose');
 const socketIo = require('socket.io');
 const path = require('path');
+const fs = require('fs/promises');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const admin = require('firebase-admin');
 
@@ -20,6 +22,7 @@ const io = socketIo(server, {
 const RAW_MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://jatin:jatinwoeyua@19july@jatin-xo.vi8oyak.mongodb.net/?appName=Jatin-XO';
 const PORT = process.env.PORT || 3000;
 const SALT_ROUNDS = 10;
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
 function normalizeMongoUri(uri) {
   const protocolSeparator = '://';
@@ -283,9 +286,76 @@ function upsertAuthProvider(existingProviders, provider) {
   return providers;
 }
 
+function getContentTypeBoundary(contentType = '') {
+  const match = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+  return match ? match[1] || match[2] : '';
+}
+
+function parseMultipartFormData(buffer, boundary) {
+  const delimiter = Buffer.from(`--${boundary}`);
+  const segments = [];
+  let startIndex = buffer.indexOf(delimiter);
+
+  while (startIndex !== -1) {
+    const endIndex = buffer.indexOf(delimiter, startIndex + delimiter.length);
+    if (endIndex === -1) {
+      break;
+    }
+    segments.push(buffer.subarray(startIndex + delimiter.length, endIndex));
+    startIndex = endIndex;
+  }
+
+  const fields = {};
+  const files = {};
+
+  segments.forEach((segment) => {
+    let part = segment;
+    if (part.subarray(0, 2).toString() === '\r\n') {
+      part = part.subarray(2);
+    }
+    if (!part.length || part.toString().startsWith('--')) {
+      return;
+    }
+
+    const headerEndIndex = part.indexOf(Buffer.from('\r\n\r\n'));
+    if (headerEndIndex === -1) {
+      return;
+    }
+
+    const rawHeaders = part.subarray(0, headerEndIndex).toString();
+    let body = part.subarray(headerEndIndex + 4);
+    if (body.subarray(body.length - 2).toString() === '\r\n') {
+      body = body.subarray(0, body.length - 2);
+    }
+
+    const nameMatch = rawHeaders.match(/name="([^"]+)"/i);
+    if (!nameMatch) {
+      return;
+    }
+
+    const fieldName = nameMatch[1];
+    const fileNameMatch = rawHeaders.match(/filename="([^"]*)"/i);
+    const contentTypeMatch = rawHeaders.match(/Content-Type:\s*([^\r\n]+)/i);
+
+    if (fileNameMatch && fileNameMatch[1]) {
+      files[fieldName] = {
+        filename: fileNameMatch[1],
+        contentType: contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream',
+        buffer: body
+      };
+      return;
+    }
+
+    fields[fieldName] = body.toString('utf8');
+  });
+
+  return { fields, files };
+}
+
 // Serve static files
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.get('/api/config/firebase', (req, res) => {
   const {
@@ -639,6 +709,146 @@ app.patch('/api/users/:uid', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Unable to update bio right now.'
+    });
+  }
+});
+
+app.patch('/api/users/update-bio', async (req, res) => {
+  const uid = typeof req.body?.uid === 'string' ? req.body.uid.trim() : '';
+  const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
+  const bio = typeof req.body?.bio === 'string' ? req.body.bio.trim() : '';
+
+  if (!uid && !username) {
+    return res.status(400).json({
+      success: false,
+      message: 'Either uid or username is required.'
+    });
+  }
+
+  if (bio.length > 140) {
+    return res.status(400).json({
+      success: false,
+      message: 'Bio must be 140 characters or fewer.'
+    });
+  }
+
+  try {
+    const query = { $or: [] };
+    if (uid) query.$or.push({ uid }, { googleUid: uid });
+    if (username) query.$or.push({ username });
+
+    const user = await User.findOne(query);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.'
+      });
+    }
+
+    user.bio = bio;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Bio updated successfully.',
+      user: {
+        uid: user.uid || user.googleUid || '',
+        username: user.username,
+        bio: user.bio || '',
+        photoURL: user.photoURL || ''
+      }
+    });
+  } catch (error) {
+    console.error('Failed to update bio:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to update bio right now.'
+    });
+  }
+});
+
+app.post('/api/users/upload-avatar', async (req, res) => {
+  const contentType = req.headers['content-type'] || '';
+  const boundary = getContentTypeBoundary(contentType);
+
+  if (!boundary) {
+    return res.status(400).json({
+      success: false,
+      message: 'Avatar upload must be multipart/form-data.'
+    });
+  }
+
+  try {
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const bodyBuffer = Buffer.concat(chunks);
+    const { fields, files } = parseMultipartFormData(bodyBuffer, boundary);
+    const uid = (fields.uid || '').trim();
+    const username = (fields.username || '').trim();
+    const avatarFile = files.avatar;
+
+    if (!uid && !username) {
+      return res.status(400).json({
+        success: false,
+        message: 'Either uid or username is required.'
+      });
+    }
+
+    if (!avatarFile || !avatarFile.buffer?.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Avatar image is required.'
+      });
+    }
+
+    if (!avatarFile.contentType.startsWith('image/')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only image uploads are supported.'
+      });
+    }
+
+    const query = { $or: [] };
+    if (uid) query.$or.push({ uid }, { googleUid: uid });
+    if (username) query.$or.push({ username });
+
+    const user = await User.findOne(query);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.'
+      });
+    }
+
+    await fs.mkdir(UPLOADS_DIR, { recursive: true });
+    const extension = path.extname(avatarFile.filename || '').replace('.', '') || 'jpg';
+    const safeExt = extension.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'jpg';
+    const baseName = `${Date.now()}-${crypto.randomUUID()}.${safeExt}`;
+    const filePath = path.join(UPLOADS_DIR, baseName);
+    await fs.writeFile(filePath, avatarFile.buffer);
+
+    const photoURL = `/uploads/${baseName}`;
+    user.photoURL = photoURL;
+    user.customPhotoURL = photoURL;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile photo updated successfully.',
+      user: {
+        uid: user.uid || user.googleUid || '',
+        username: user.username,
+        photoURL: user.photoURL || '',
+        bio: user.bio || ''
+      }
+    });
+  } catch (error) {
+    console.error('Failed to upload avatar:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to upload avatar right now.'
     });
   }
 });
