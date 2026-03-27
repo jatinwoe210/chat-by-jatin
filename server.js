@@ -518,8 +518,9 @@ app.post('/api/auth/google', async (req, res) => {
         uid: googleUid,
         googleUid,
         email,
-        name: inferredName,
         displayName: inferredName,
+        googlePhotoURL: photoURL,
+        customPhotoURL: '',
         photoURL,
         bio: '',
         authProviders: ['google']
@@ -529,9 +530,10 @@ app.post('/api/auth/google', async (req, res) => {
       user.uid = user.uid || googleUid;
       user.googleUid = user.googleUid || googleUid;
       user.email = user.email || email;
-      user.name = user.name || inferredName;
       user.displayName = user.displayName || inferredName;
-      user.photoURL = user.photoURL || photoURL;
+      user.googlePhotoURL = user.googlePhotoURL || photoURL;
+      user.customPhotoURL = user.customPhotoURL || '';
+      user.photoURL = user.customPhotoURL || user.photoURL || user.googlePhotoURL || photoURL;
       user.bio = typeof user.bio === 'string' ? user.bio : '';
       user.authProviders = upsertAuthProvider(user.authProviders, 'google');
       await user.save();
@@ -547,9 +549,10 @@ app.post('/api/auth/google', async (req, res) => {
         uid: user.uid || user.googleUid,
         email: user.email,
         username: user.username,
-        name: user.name,
         displayName: user.displayName,
-        photoURL: user.photoURL || '',
+        googlePhotoURL: user.googlePhotoURL || '',
+        customPhotoURL: user.customPhotoURL || '',
+        photoURL: user.customPhotoURL || user.photoURL || user.googlePhotoURL || '',
         bio: user.bio || ''
       }
     });
@@ -700,8 +703,14 @@ app.patch('/api/users/:uid', async (req, res) => {
       success: true,
       message: 'Bio updated successfully.',
       user: {
-        uid: user.uid || user.googleUid,
-        bio: user.bio || ''
+        uid: user.uid || user.googleUid || '',
+        username: user.username || '',
+        displayName: user.displayName || user.name || user.username || '',
+        email: user.email || '',
+        bio: user.bio || '',
+        googlePhotoURL: user.googlePhotoURL || '',
+        customPhotoURL: user.customPhotoURL || '',
+        photoURL: user.customPhotoURL || user.photoURL || user.googlePhotoURL || ''
       }
     });
   } catch (error) {
@@ -709,6 +718,52 @@ app.patch('/api/users/:uid', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Unable to update bio right now.'
+    });
+  }
+});
+
+app.get('/api/users/:uid', async (req, res) => {
+  const uid = typeof req.params.uid === 'string' ? req.params.uid.trim() : '';
+  const username = typeof req.query?.username === 'string' ? req.query.username.trim() : '';
+
+  if (!uid && !username) {
+    return res.status(400).json({
+      success: false,
+      message: 'Either uid or username is required.'
+    });
+  }
+
+  try {
+    const query = { $or: [] };
+    if (uid) query.$or.push({ uid }, { googleUid: uid });
+    if (username) query.$or.push({ username });
+    const user = await User.findOne(query).lean();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      user: {
+        uid: user.uid || user.googleUid || '',
+        username: user.username || '',
+        displayName: user.displayName || user.name || user.username || '',
+        email: user.email || '',
+        bio: user.bio || '',
+        googlePhotoURL: user.googlePhotoURL || '',
+        customPhotoURL: user.customPhotoURL || '',
+        photoURL: user.customPhotoURL || user.photoURL || user.googlePhotoURL || ''
+      }
+    });
+  } catch (error) {
+    console.error('Failed to fetch user profile:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to fetch user profile right now.'
     });
   }
 });
@@ -983,13 +1038,14 @@ app.get('/api/contacts', async (req, res) => {
 
     const contactsUsernames = (user.contacts || []).filter((contact) => contact && contact !== username);
     const contacts = await User.find({ username: { $in: contactsUsernames } })
-      .select('username displayName name')
+      .select('username displayName name photoURL googlePhotoURL customPhotoURL')
       .lean();
 
     const mappedContacts = contacts
       .map((contact) => ({
         username: contact.username,
-        displayName: contact.displayName || contact.name || contact.username
+        displayName: contact.displayName || contact.name || contact.username,
+        photoURL: contact.customPhotoURL || contact.photoURL || contact.googlePhotoURL || ''
       }))
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
@@ -1053,7 +1109,8 @@ app.post('/api/contacts/add', async (req, res) => {
       success: true,
       contact: {
         username: targetUser.username,
-        displayName: targetUser.displayName || targetUser.name || targetUser.username
+        displayName: targetUser.displayName || targetUser.name || targetUser.username,
+        photoURL: targetUser.customPhotoURL || targetUser.photoURL || targetUser.googlePhotoURL || ''
       }
     });
   } catch (error) {
