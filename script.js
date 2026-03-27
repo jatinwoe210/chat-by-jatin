@@ -117,9 +117,9 @@ if (profileDrawer) {
     profileDrawer.hidden = true;
 }
 
-function openProfileDrawer() {
+async function openProfileDrawer() {
     if (!profileDrawer) return;
-    syncProfileDrawer();
+    await refreshCurrentUserProfile();
     profileDrawer.hidden = false;
     profileDrawer.classList.add('active');
 }
@@ -214,6 +214,17 @@ async function postJson(endpoint, payload) {
         body: JSON.stringify(payload)
     });
 
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Request failed.');
+    }
+
+    return result;
+}
+
+async function getJson(endpoint) {
+    const response = await fetch(endpoint);
     const result = await response.json();
 
     if (!response.ok || !result.success) {
@@ -496,6 +507,38 @@ function enterChat() {
     loadContacts();
 }
 
+async function refreshCurrentUserProfile() {
+    const uid = currentUserProfile.uid || '';
+    const username = currentUserProfile.username || currentUser || '';
+
+    if (!uid && !username) {
+        syncProfileDrawer();
+        return;
+    }
+
+    const resolvedUid = uid || 'lookup';
+    const profileQuery = username ? `?username=${encodeURIComponent(username)}` : '';
+
+    try {
+        const result = await getJson(`/api/users/${encodeURIComponent(resolvedUid)}${profileQuery}`);
+        const user = result.user || {};
+        currentUserProfile = {
+            ...currentUserProfile,
+            uid: user.uid || currentUserProfile.uid || '',
+            username: user.username || currentUserProfile.username || currentUser || '',
+            displayName: user.displayName || currentUserProfile.displayName || currentUser || '',
+            email: user.email || currentUserProfile.email || '',
+            bio: user.bio || '',
+            photoURL: user.customPhotoURL || user.photoURL || user.googlePhotoURL || ''
+        };
+        currentUser = currentUserProfile.username || currentUser;
+    } catch (error) {
+        addSystemMessage(error.message || 'Unable to refresh profile.');
+    } finally {
+        syncProfileDrawer();
+    }
+}
+
 async function handleLogout() {
     if (firebaseAuth?.currentUser) {
         await firebaseAuth.signOut();
@@ -588,12 +631,16 @@ async function saveBio() {
     showDrawerBioMessage('');
 
     try {
-        const result = await patchJson('/api/users/update-bio', {
-            uid: currentUserProfile.uid || '',
-            username: currentUserProfile.username || currentUser || '',
-            bio
-        });
+        const uid = currentUserProfile.uid || '';
+        if (!uid) {
+            throw new Error('User uid is missing.');
+        }
+
+        const result = await patchJson(`/api/users/${encodeURIComponent(uid)}`, { bio });
         currentUserProfile.bio = result.user?.bio || bio;
+        currentUserProfile.username = result.user?.username || currentUserProfile.username;
+        currentUserProfile.displayName = result.user?.displayName || currentUserProfile.displayName;
+        currentUserProfile.photoURL = result.user?.photoURL || currentUserProfile.photoURL;
         if (drawerBioInput) {
             drawerBioInput.value = currentUserProfile.bio;
         }
@@ -802,6 +849,9 @@ function updateUsersList(userList) {
 
         userDiv.className = `user-item${activeClass}`;
         userDiv.innerHTML = `
+            <div class="user-avatar-wrap">
+                ${contact.photoURL ? `<img class="contact-avatar" src="${escapeHtml(contact.photoURL)}" alt="${escapeHtml(contact.displayName)} avatar">` : `<span class="contact-avatar-fallback">${escapeHtml((contact.displayName || contact.username || 'U').charAt(0).toUpperCase())}</span>`}
+            </div>
             <span class="user-presence"></span>
             <div class="user-meta">
                 <strong>${escapeHtml(contact.displayName)}</strong>
